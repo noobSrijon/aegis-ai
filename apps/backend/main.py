@@ -102,6 +102,18 @@ async def get_guarding(user = Depends(get_current_user)):
         print(f"Guarding error: {e}")
         return []
 
+@app.get("/api/my-guardians")
+async def get_my_guardians(user = Depends(get_current_user)):
+    if not supabase:
+        return []
+    try:
+        # Fetch guardians added by the current user
+        res = supabase.table("guardians").select("*").eq("user_id", user.id).execute()
+        return res.data
+    except Exception as e:
+        print(f"My Guardians error: {e}")
+        return []
+
 @app.get("/api/notifications")
 async def get_notifications(user = Depends(get_current_user)):
     if not supabase:

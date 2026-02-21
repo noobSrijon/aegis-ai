@@ -25,6 +25,7 @@ export default function Home() {
   const [showAddGuardianModal, setShowAddGuardianModal] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
   const [guarding, setGuarding] = useState<any[]>([]);
+  const [myGuardians, setMyGuardians] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [isRecording, setIsRecording] = useState(false);
   const [guardianEmail, setGuardianEmail] = useState("");
@@ -40,6 +41,31 @@ export default function Home() {
   const locationInterval = useRef<NodeJS.Timeout | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  const fetchBaseData = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const headers = { "Authorization": `Bearer ${session?.access_token}` };
+
+    const [profRes, histRes, guardRes, myGuardRes, notifRes] = await Promise.all([
+      fetch("http://localhost:8000/api/profile", { headers }),
+      fetch("http://localhost:8000/api/history", { headers }),
+      fetch("http://localhost:8000/api/guarding", { headers }),
+      fetch("http://localhost:8000/api/my-guardians", { headers }),
+      fetch("http://localhost:8000/api/notifications", { headers })
+    ]);
+
+    const [profData, histData, guardData, myGuardData, notifData] = await Promise.all([
+      profRes.json(), histRes.json(), guardRes.json(), myGuardRes.json(), notifRes.json()
+    ]);
+
+    setProfile(profData);
+    if (!profData.is_enrolled) setShowOnboarding(true);
+
+    setHistory(histData);
+    setGuarding(guardData);
+    setMyGuardians(myGuardData);
+    setNotifications(notifData);
+  };
+
   useEffect(() => {
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -48,28 +74,7 @@ export default function Home() {
         return;
       }
       setUser(user);
-
-      const { data: { session } } = await supabase.auth.getSession();
-      const headers = { "Authorization": `Bearer ${session?.access_token}` };
-
-      // Parallel fetch
-      const [profRes, histRes, guardRes, notifRes] = await Promise.all([
-        fetch("http://localhost:8000/api/profile", { headers }),
-        fetch("http://localhost:8000/api/history", { headers }),
-        fetch("http://localhost:8000/api/guarding", { headers }),
-        fetch("http://localhost:8000/api/notifications", { headers })
-      ]);
-
-      const [profData, histData, guardData, notifData] = await Promise.all([
-        profRes.json(), histRes.json(), guardRes.json(), notifRes.json()
-      ]);
-
-      setProfile(profData);
-      if (!profData.is_enrolled) setShowOnboarding(true);
-
-      setHistory(histData);
-      setGuarding(guardData);
-      setNotifications(notifData);
+      await fetchBaseData();
     };
     init();
   }, [router, supabase]);
@@ -219,6 +224,9 @@ export default function Home() {
       body: JSON.stringify({ guardian_email: guardianEmail, guardian_phone: guardianPhone })
     });
 
+    // Refresh data
+    await fetchBaseData();
+
     // Clear form and close modal
     setGuardianEmail("");
     setGuardianPhone("");
@@ -267,7 +275,7 @@ export default function Home() {
                 <h2 className="text-2xl font-black mb-2 text-center">Guardian Setup</h2>
                 <form onSubmit={handleAddGuardian} className="space-y-4">
                   <input type="email" required placeholder="Guardian Email" value={guardianEmail} onChange={(e) => setGuardianEmail(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:border-white/20 outline-none" />
-                  <input type="tel" placeholder="Guardian Phone" value={guardianPhone} onChange={(e) => setGuardianPhone(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:border-white/20 outline-none" />
+                  <input type="tel" placeholder="Guardian Phone" value={guardianEmail} onChange={(e) => setGuardianPhone(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:border-white/20 outline-none" />
                   <button className="w-full py-4 bg-white text-black rounded-full font-bold hover:scale-105 transition-all">COMPLETE SETUP</button>
                 </form>
               </div>
@@ -305,7 +313,6 @@ export default function Home() {
                 <p className="text-zinc-400 text-sm">Conversational guardian for high-stakes events. Real-time risk evaluation as you speak.</p>
               </div>
               <button onClick={startMonitoring} disabled={status === 'connecting'} className="px-10 py-5 bg-white text-black font-black rounded-full hover:scale-105 active:scale-95 transition-all">INITIATE BLACK-BOX</button>
-
             </div>
           ) : (
             <div className="flex-1 flex flex-col">
@@ -360,28 +367,54 @@ export default function Home() {
       )}
 
       {activeTab === "guardians" && (
-        <main className="flex-1 flex flex-col pt-24 px-4 max-w-4xl mx-auto w-full">
-          <div className="flex justify-between items-center mb-8">
-            <h2 className="text-2xl font-black">Protected Connections</h2>
-            <button onClick={() => setShowAddGuardianModal(true)} className="px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-full text-xs font-bold hover:bg-zinc-800 transition-all flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-              ADD GUARDIAN
-            </button>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {guarding.length === 0 ? <div className="col-span-full p-12 border-2 border-dashed border-zinc-900 rounded-3xl text-center text-zinc-600 italic">You aren&apos;t guarding anyone yet.</div> :
-              guarding.map((p, i) => (
-                <div key={i} className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6 flex items-center justify-between group transition-all hover:bg-zinc-900">
-                  <div className="flex items-center gap-4">
-                    <div className="h-12 w-12 rounded-full bg-zinc-800 flex items-center justify-center font-black text-zinc-500 group-hover:text-white">{p.full_name?.charAt(0) || p.email.charAt(0).toUpperCase()}</div>
-                    <div><h4 className="font-bold text-zinc-100">{p.full_name || "Anonymous User"}</h4><p className="text-xs text-zinc-500 font-mono">{p.email}</p></div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[10px] font-bold text-green-500 uppercase tracking-widest mb-1 block">Active</span>
-                    <button className="text-[10px] font-black text-white hover:underline uppercase">View Live Status</button>
-                  </div>
-                </div>
-              ))}
+        <main className="flex-1 flex flex-col pt-24 px-4 max-w-4xl mx-auto w-full pb-20">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+            {/* Left Column: My Protectors */}
+            <div>
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-black">My Protectors</h2>
+                <button onClick={() => setShowAddGuardianModal(true)} className="px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-full text-xs font-bold hover:bg-zinc-800 transition-all flex items-center gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                  ADD
+                </button>
+              </div>
+              <p className="text-zinc-500 text-sm mb-6">These are the people notified during your high-risk sessions.</p>
+              <div className="space-y-3">
+                {myGuardians.length === 0 ? <div className="p-8 border border-dashed border-zinc-900 rounded-2xl text-center text-zinc-600 text-sm">Nobody is protecting you yet.</div> :
+                  myGuardians.map((g, i) => (
+                    <div key={i} className="bg-zinc-900/30 border border-zinc-800/50 rounded-2xl p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-full bg-zinc-800 flex items-center justify-center font-bold text-zinc-500 uppercase">{g.guardian_email?.charAt(0)}</div>
+                        <div>
+                          <h4 className="text-sm font-bold text-zinc-200">{g.guardian_email}</h4>
+                          <span className={`text-[10px] font-bold uppercase tracking-wider ${g.status === 'active' ? 'text-green-500' : 'text-zinc-500'}`}>{g.status}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+
+            {/* Right Column: People I Guard */}
+            <div>
+              <h2 className="text-2xl font-black mb-6">Watching Over</h2>
+              <p className="text-zinc-500 text-sm mb-6">Users who have added you as their safety contact.</p>
+              <div className="grid grid-cols-1 gap-4">
+                {guarding.length === 0 ? <div className="p-12 border-2 border-dashed border-zinc-900 rounded-3xl text-center text-zinc-600 italic">You aren&apos;t guarding anyone yet.</div> :
+                  guarding.map((p, i) => (
+                    <div key={i} className="bg-zinc-100/[0.03] border border-zinc-800/50 rounded-3xl p-6 flex items-center justify-between group transition-all hover:bg-zinc-900">
+                      <div className="flex items-center gap-4">
+                        <div className="h-12 w-12 rounded-full bg-zinc-800 flex items-center justify-center font-black text-zinc-500 group-hover:text-white uppercase">{p.full_name?.charAt(0) || p.email.charAt(0)}</div>
+                        <div><h4 className="font-bold text-zinc-100">{p.full_name || "Anonymous User"}</h4><p className="text-xs text-zinc-500 font-mono">{p.email}</p></div>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] font-bold text-green-500 uppercase tracking-widest mb-1 block">Active</span>
+                        <button className="text-[10px] font-black text-white hover:underline uppercase transition-all">Live Status</button>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
           </div>
         </main>
       )}
