@@ -8,6 +8,8 @@ from supabase.lib.client_options import ClientOptions
 from dotenv import load_dotenv
 
 import assemblyai as aai
+from auth_utils import get_current_user
+from fastapi import Depends
 
 load_dotenv()
 
@@ -45,12 +47,17 @@ app.add_middleware(
 async def read_root():
     return {"message": "Hello from FastAPI backend!"}
 
+
+@app.get('/settings')
+async def get_settings():
+    
+
 @app.get("/api/health")
 async def health_check():
     return {"status": "ok"}
 
 @app.post("/api/threads")
-async def create_thread():
+async def create_thread(user = Depends(get_current_user)):
     if not supabase:
         # Fallback for development without Supabase
         import uuid
