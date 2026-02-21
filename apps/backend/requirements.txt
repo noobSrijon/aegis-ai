@@ -1,2 +1,5 @@
 fastapi
 uvicorn
+supabase==2.23.0
+python-dotenv
+assemblyai
