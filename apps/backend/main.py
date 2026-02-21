@@ -298,7 +298,8 @@ async def monitor_audio(websocket: WebSocket, thread_id: str = "default"):
                     print(f"Supabase error: {e}")
 
             # Risk Analysis
-            risk_level = 85.0 if any(word in sentence.lower() for word in ["suspicious", "terminal", "danger", "alert", "security"]) else 15.0
+            result = await assess_danger(sentence, session_location)
+            risk_level = result["score"]
             
             # Guardian Notifications on High Risk
             if risk_level >= 80 and supabase:
@@ -319,11 +320,7 @@ async def monitor_audio(websocket: WebSocket, thread_id: str = "default"):
                     print(f"Notification error: {e}")
 
             # Defense mechanism
-            defense_msg = ""
-            if risk_level < 20: defense_msg = "NORMAL: No action required."
-            elif risk_level < 60: defense_msg = "CAUTION: Notify administrator."
-            elif risk_level < 90: defense_msg = "HIGH RISK: Trigger local alarm."
-            else: defense_msg = "CRITICAL: System isolation initiated."
+            defense_msg = result["reason"]
 
             try:
                 await websocket.send_json({
@@ -416,7 +413,8 @@ async def monitor_audio(websocket: WebSocket, thread_id: str = "default"):
                                     print(f"Supabase error: {e}")
                             
                             # Analyze
-                            risk_level = 85.0 if any(word in text.lower() for word in ["suspicious", "terminal", "danger", "alert", "security", "threat"]) else 15.0
+                            result = await assess_danger(text, {"lat": lat, "lon": lon})
+                            risk_level = result["score"]
                             
                             # Guardian Notifications on High Risk (Manual Chat)
                             if risk_level >= 80 and supabase:
