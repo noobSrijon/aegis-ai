@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { createClient } from "@/utils/supabase/client";
+import { useRouter } from "next/navigation";
+import { User } from "@supabase/supabase-js";
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<"black-box" | "guardian">("black-box");
@@ -13,6 +16,27 @@ export default function Home() {
   const [status, setStatus] = useState<"idle" | "connecting" | "active" | "error">("idle");
   const [location, setLocation] = useState<{ lat: number, lon: number } | null>(null);
   const [manualInput, setManualInput] = useState("");
+  const [_user, setUser] = useState<User | null>(null);
+
+  const supabase = createClient();
+  const router = useRouter();
+
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push("/login");
+      } else {
+        setUser(user);
+      }
+    };
+    checkUser();
+  }, [router, supabase]);
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    router.push("/login");
+  };
 
   const ws = useRef<WebSocket | null>(null);
   const audioContext = useRef<AudioContext | null>(null);
@@ -67,7 +91,13 @@ export default function Home() {
     setStatus("connecting");
     try {
       // 1. Create a new thread
-      const res = await fetch("http://localhost:8000/api/threads", { method: "POST" });
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch("http://localhost:8000/api/threads", { 
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${session?.access_token}`
+        }
+      });
       const data = await res.json();
       const newThreadId = data.id;
       setThreadId(newThreadId);
@@ -88,8 +118,7 @@ export default function Home() {
 
         if (msg.transcript) {
           if (msg.is_final) {
-            // Only add if it's not a manual message we just sent (to avoid duplicates if we used optimistic)
-            // Or better: just let the backend be the source of truth and remove optimistic UI for now
+
             setTranscripts((prev) => [...prev, msg.transcript].slice(-20));
             setCurrentTranscript("");
           } else {
@@ -163,6 +192,13 @@ export default function Home() {
         >
           guardian
         </button>
+        <div className="w-[1px] h-4 bg-zinc-800 mx-2" />
+        <button
+          onClick={handleSignOut}
+          className="pr-4 py-2 text-xs font-bold text-zinc-500 hover:text-red-400 transition-colors uppercase tracking-widest"
+        >
+          Sign Out
+        </button>
       </nav>
 
       {activeTab === "black-box" ? (
@@ -179,9 +215,9 @@ export default function Home() {
                   As you speak, your shadow re-evaluates risk in real-time.
                 </p>
                 <div className="mt-6 flex flex-col gap-2 text-[10px] text-zinc-500 font-mono text-left bg-black/30 p-3 rounded-lg border border-zinc-800/50 italic">
-                  <span>- "The person is late..."</span>
-                  <span>- "They asked me to walk to their car..."</span>
-                  <span>- "I feel fine but the vibe is off."</span>
+                  <span>- &quot;The person is late...&quot;</span>
+                  <span>- &quot;They asked me to walk to their car...&quot;</span>
+                  <span>- &quot;I feel fine but the vibe is off.&quot;</span>
                 </div>
               </div>
 
