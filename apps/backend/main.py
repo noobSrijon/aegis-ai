@@ -150,6 +150,39 @@ async def get_profile(user=Depends(get_current_user)):
         return {"id": user.id, "email": user.email, "is_enrolled": False}
 
 
+@app.get("/api/profile/role")
+async def get_profile_role(user=Depends(get_current_user)):
+    if not supabase:
+        return {"account_role": "both"}
+    try:
+        res = supabase.table("profiles").select("account_role").eq("id", user.id).execute()
+        if res.data:
+            role = res.data[0].get("account_role", "both")
+            return {"account_role": role}
+        return {"account_role": "both"}
+    except Exception as e:
+        print(f"Role fetch error: {e}")
+        return {"account_role": "both"}
+
+
+@app.post("/api/profile/role")
+async def update_profile_role(data: RoleUpdate, user=Depends(get_current_user)):
+    if not supabase:
+        return {"message": "Supabase not configured"}
+
+    role = data.account_role
+
+    if role not in ["guardian", "both"]:
+        return {"error": "Invalid role. Must be 'guardian' or 'both'"}, 400
+
+    try:
+        supabase.table("profiles").update({"account_role": role}).eq("id", user.id).execute()
+        return {"message": f"Account role updated to {role}"}
+    except Exception as e:
+        print(f"Role update error: {e}")
+        return {"error": str(e)}, 400
+
+
 @app.get("/api/history")
 async def get_history(user=Depends(get_current_user)):
     if not supabase:
