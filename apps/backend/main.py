@@ -2,6 +2,7 @@ import os
 import json
 import asyncio
 from dotenv import load_dotenv
+from risk_analysis import assess_danger
 
 load_dotenv()
 
@@ -428,11 +429,7 @@ async def monitor_audio(websocket: WebSocket, thread_id: str = "default"):
                                 except Exception as e:
                                     print(f"Notification error: {e}")
 
-                            defense_msg = ""
-                            if risk_level < 20: defense_msg = "NORMAL: No action required."
-                            elif risk_level < 60: defense_msg = "CAUTION: Notify administrator."
-                            elif risk_level < 90: defense_msg = "HIGH RISK: Trigger local alarm."
-                            else: defense_msg = "CRITICAL: System isolation initiated."
+                            defense_msg = result["reason"]
                             
                             await websocket.send_json({
                                 "risk": risk_level,
