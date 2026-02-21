@@ -20,6 +20,10 @@ CREATE TABLE IF NOT EXISTS public.guardians (
 );
 
 -- 3. Create Threads Table
+CREATE TABLE IF NOT EXISTS public.threads (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+    initial_context TEXT,
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -77,7 +81,6 @@ CREATE POLICY "Users can view logs for their own threads" ON public.logs FOR SEL
 );
 
 -- 4. Automate Profile Creation on Signup
--- This function inserts a row into public.profiles when a new user signs up
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN

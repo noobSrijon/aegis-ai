@@ -23,6 +23,10 @@ export default function Home() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState<1 | 2>(1);
   const [showAddGuardianModal, setShowAddGuardianModal] = useState(false);
+  const [showInitiationModal, setShowInitiationModal] = useState(false);
+  const [sessionContext, setSessionContext] = useState("");
+  const [monitoringMode, setMonitoringMode] = useState<"audio" | "text" | "both">("both");
+
   const [history, setHistory] = useState<any[]>([]);
   const [guarding, setGuarding] = useState<any[]>([]);
   const [myGuardians, setMyGuardians] = useState<any[]>([]);
@@ -42,28 +46,33 @@ export default function Home() {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const fetchBaseData = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    const headers = { "Authorization": `Bearer ${session?.access_token}` };
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const headers = { "Authorization": `Bearer ${session?.access_token}` };
 
-    const [profRes, histRes, guardRes, myGuardRes, notifRes] = await Promise.all([
-      fetch("http://localhost:8000/api/profile", { headers }),
-      fetch("http://localhost:8000/api/history", { headers }),
-      fetch("http://localhost:8000/api/guarding", { headers }),
-      fetch("http://localhost:8000/api/my-guardians", { headers }),
-      fetch("http://localhost:8000/api/notifications", { headers })
-    ]);
+      const [profRes, histRes, guardRes, myGuardRes, notifRes] = await Promise.all([
+        fetch("http://localhost:8000/api/profile", { headers }),
+        fetch("http://localhost:8000/api/history", { headers }),
+        fetch("http://localhost:8000/api/guarding", { headers }),
+        fetch("http://localhost:8000/api/my-guardians", { headers }),
+        fetch("http://localhost:8000/api/notifications", { headers })
+      ]);
 
-    const [profData, histData, guardData, myGuardData, notifData] = await Promise.all([
-      profRes.json(), histRes.json(), guardRes.json(), myGuardRes.json(), notifRes.json()
-    ]);
+      const [profData, histData, guardData, myGuardData, notifData] = await Promise.all([
+        profRes.json(), histRes.json(), guardRes.json(), myGuardRes.json(), notifRes.json()
+      ]);
 
-    setProfile(profData);
-    if (!profData.is_enrolled) setShowOnboarding(true);
+      setProfile(profData);
+      if (profData && !profData.is_enrolled) setShowOnboarding(true);
 
-    setHistory(histData);
-    setGuarding(guardData);
-    setMyGuardians(myGuardData);
-    setNotifications(notifData);
+      setHistory(histData || []);
+      setGuarding(guardData || []);
+      setMyGuardians(myGuardData || []);
+      setNotifications(notifData || []);
+    } catch (err) {
+      console.error("Base data fetch failed:", err);
+    }
   };
 
   useEffect(() => {
@@ -91,6 +100,15 @@ export default function Home() {
       headers: { "Authorization": `Bearer ${session?.access_token}` }
     });
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+  };
+
+  const handleAcceptGuardian = async (id: string) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    await fetch(`http://localhost:8000/api/guardians/accept/${id}`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${session?.access_token}` }
+    });
+    await fetchBaseData();
   };
 
   // Auto-scroll chat
@@ -128,39 +146,97 @@ export default function Home() {
   }, [isMonitoring, status]);
 
   const startMonitoring = async () => {
+    // Clear old session state
+    setTranscripts([]);
+    setCurrentTranscript("");
+    setRisk(0);
+    setAction("Shadow is idle.");
+
     setStatus("connecting");
+    setShowInitiationModal(false);
+    console.log("Starting monitoring session...");
+
     try {
       const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.error("No active session found");
+        setStatus("error");
+        return;
+      }
+
+      console.log("Creating session thread...");
       const res = await fetch("http://localhost:8000/api/threads", {
         method: "POST",
-        headers: { "Authorization": `Bearer ${session?.access_token}` }
+        headers: {
+          "Authorization": `Bearer ${session?.access_token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ initial_context: sessionContext || "" })
       });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        console.error("Thread creation failed with status:", res.status, errText);
+        setStatus("error");
+        return;
+      }
+
       const data = await res.json();
+      console.log("Thread created successfully:", data);
+
+      if (!data || !data.id) {
+        console.error("No thread ID in response:", data);
+        setStatus("error");
+        return;
+      }
+
       setThreadId(data.id);
 
-      ws.current = new WebSocket(`ws://localhost:8000/ws/monitor?thread_id=${data.id}`);
+      const wsUrl = `ws://127.0.0.1:8000/ws/${data.id}`;
+      console.log("Attempting WebSocket connection to:", wsUrl);
+
+      ws.current = new WebSocket(wsUrl);
+
       ws.current.onopen = () => {
+        console.log("WebSocket connected successfully!");
         setStatus("active");
         setIsMonitoring(true);
-        startRecording();
-      };
-      ws.current.onmessage = (event) => {
-        const msg = JSON.parse(event.data);
-        setRisk(msg.risk);
-        setAction(msg.action);
-        if (msg.transcript) {
-          if (msg.is_final) {
-            setTranscripts((prev) => [...prev, msg.transcript].slice(-20));
-            setCurrentTranscript("");
-          } else {
-            setCurrentTranscript(msg.transcript);
-          }
+        if (monitoringMode === "audio" || monitoringMode === "both") {
+          console.log("Starting audio recording...");
+          startRecording();
         }
       };
-      ws.current.onclose = () => stopMonitoring();
-      ws.current.onerror = () => setStatus("error");
+
+      ws.current.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          setRisk(msg.risk || 0);
+          setAction(msg.action || "Shadow is monitoring...");
+          if (msg.transcript) {
+            if (msg.is_final) {
+              setTranscripts((prev) => [...prev, msg.transcript].slice(-20));
+              setCurrentTranscript("");
+            } else {
+              setCurrentTranscript(msg.transcript);
+            }
+          }
+        } catch (e) {
+          console.error("Failed to parse WebSocket message:", event.data, e);
+        }
+      };
+
+      ws.current.onclose = (event) => {
+        console.log("WebSocket closed:", event.code, event.reason);
+        stopMonitoring();
+      };
+
+      ws.current.onerror = (err) => {
+        console.error("WebSocket error observed:", err);
+        setStatus("error");
+      };
+
     } catch (err) {
-      console.error("Monitoring start failed:", err);
+      console.error("Detailed monitoring initiation error:", err);
       setStatus("error");
     }
   };
@@ -184,12 +260,13 @@ export default function Home() {
       source.connect(audioWorklet.current);
       audioWorklet.current.connect(audioContext.current.destination);
     } catch (err) {
-      console.error("Mic error:", err);
+      console.error("Mic access error:", err);
       setStatus("error");
     }
   };
 
   const stopMonitoring = () => {
+    console.log("Stopping monitoring session...");
     setIsMonitoring(false);
     setStatus("idle");
     setCurrentTranscript("");
@@ -202,45 +279,56 @@ export default function Home() {
   const handleEnrollVoice = async () => {
     setIsRecording(true);
     setTimeout(async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      const formData = new FormData();
-      formData.append("file", new Blob(["dummy"], { type: "audio/wav" }), "voice.wav");
-      await fetch("http://localhost:8000/api/enroll-voice", {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${session?.access_token}` },
-        body: formData
-      });
-      setIsRecording(false);
-      setOnboardingStep(2);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const formData = new FormData();
+        formData.append("file", new Blob(["dummy"], { type: "audio/wav" }), "voice.wav");
+        await fetch("http://localhost:8000/api/enroll-voice", {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${session?.access_token}` },
+          body: formData
+        });
+        setIsRecording(false);
+        setOnboardingStep(2);
+      } catch (err) {
+        console.error("Voice enrollment failed:", err);
+        setIsRecording(false);
+      }
     }, 2000);
   };
 
   const handleAddGuardian = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { data: { session } } = await supabase.auth.getSession();
-    await fetch("http://localhost:8000/api/guardians/add", {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${session?.access_token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ guardian_email: guardianEmail, guardian_phone: guardianPhone })
-    });
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      await fetch("http://localhost:8000/api/guardians/add", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${session?.access_token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ guardian_email: guardianEmail, guardian_phone: guardianPhone })
+      });
 
-    // Refresh data
-    await fetchBaseData();
+      // Refresh data
+      await fetchBaseData();
 
-    // Clear form and close modal
-    setGuardianEmail("");
-    setGuardianPhone("");
-    setShowAddGuardianModal(false);
+      // Clear form and close modal
+      setGuardianEmail("");
+      setGuardianPhone("");
+      setShowAddGuardianModal(false);
 
-    // If it was onboarding, finish it
-    if (showOnboarding) {
-      setProfile(prev => prev ? { ...prev, is_enrolled: true } : null);
-      setTimeout(() => {
-        setShowOnboarding(false);
-        setActiveTab("black-box");
-        setIsMonitoring(false);
-        setStatus("idle");
-      }, 500);
+      // If it was onboarding, finish it
+      if (showOnboarding) {
+        setProfile(prev => prev ? { ...prev, is_enrolled: true } : null);
+        setTimeout(() => {
+          setShowOnboarding(false);
+          setActiveTab("black-box");
+          setIsMonitoring(false);
+          setStatus("idle");
+        }, 500);
+      }
+    } catch (err) {
+      console.error("Add guardian failed:", err);
     }
   };
 
@@ -275,11 +363,68 @@ export default function Home() {
                 <h2 className="text-2xl font-black mb-2 text-center">Guardian Setup</h2>
                 <form onSubmit={handleAddGuardian} className="space-y-4">
                   <input type="email" required placeholder="Guardian Email" value={guardianEmail} onChange={(e) => setGuardianEmail(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:border-white/20 outline-none" />
-                  <input type="tel" placeholder="Guardian Phone" value={guardianEmail} onChange={(e) => setGuardianPhone(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:border-white/20 outline-none" />
+                  <input type="tel" placeholder="Guardian Phone" value={guardianPhone} onChange={(e) => setGuardianPhone(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:border-white/20 outline-none" />
                   <button className="w-full py-4 bg-white text-black rounded-full font-bold hover:scale-105 transition-all">COMPLETE SETUP</button>
                 </form>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Initiation Modal */}
+      {showInitiationModal && (
+        <div className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4">
+          <div className="max-w-md w-full bg-zinc-900 border border-zinc-100/10 rounded-[40px] p-10 shadow-3xl animate-in zoom-in-95 duration-300">
+            <div className="mb-8">
+              <h3 className="text-3xl font-black mb-2 tracking-tight">Initiate Session</h3>
+              <p className="text-zinc-500 text-sm leading-relaxed">Tell us what's happening so your guardians have the full context if things escalate.</p>
+            </div>
+
+            <div className="space-y-8">
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-600 mb-4">SITUATION CONTEXT</label>
+                <textarea
+                  value={sessionContext}
+                  onChange={(e) => setSessionContext(e.target.value)}
+                  placeholder="e.g. Walking to my car in a dark parking lot..."
+                  className="w-full bg-black border border-zinc-800 rounded-3xl p-5 text-sm text-zinc-100 placeholder:text-zinc-700 focus:outline-none focus:border-zinc-500 transition-all min-h-[120px] resize-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-600 mb-4">MONITORING MODE</label>
+                <div className="grid grid-cols-3 gap-3">
+                  {(['audio', 'text', 'both'] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      onClick={() => setMonitoringMode(mode)}
+                      className={`py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border ${monitoringMode === mode
+                        ? 'bg-white text-black border-white shadow-[0_0_20px_rgba(255,255,255,0.1)]'
+                        : 'bg-black text-zinc-500 border-zinc-800 hover:border-zinc-700'
+                        }`}
+                    >
+                      {mode}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="pt-6 flex flex-col gap-4">
+                <button
+                  onClick={startMonitoring}
+                  className="w-full py-5 bg-white text-black font-black rounded-full hover:scale-[1.02] active:scale-[0.98] transition-all uppercase tracking-[0.15em] shadow-xl"
+                >
+                  START BLACK-BOX
+                </button>
+                <button
+                  onClick={() => setShowInitiationModal(false)}
+                  className="w-full py-3 text-zinc-600 font-bold hover:text-zinc-400 transition-all uppercase text-[10px] tracking-widest"
+                >
+                  GO BACK
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -304,6 +449,55 @@ export default function Home() {
         </div>
       )}
 
+      {/* Session Initiation Modal */}
+      {showInitiationModal && (
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowInitiationModal(false)}>
+          <div className="max-w-lg w-full bg-zinc-900 border border-zinc-800 rounded-3xl p-8 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-black">Session Setup</h2>
+              <button onClick={() => setShowInitiationModal(false)} className="text-zinc-500 hover:text-white">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              </button>
+            </div>
+            <div className="space-y-6">
+              <div>
+                <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3">Situation Context</label>
+                <textarea
+                  placeholder="e.g. Walking home late at night, Meeting someone from the internet, Heading into a tense meeting..."
+                  value={sessionContext}
+                  onChange={(e) => setSessionContext(e.target.value)}
+                  className="w-full bg-black border border-zinc-800 rounded-2xl p-4 text-sm focus:border-white/20 outline-none h-32 resize-none leading-relaxed"
+                />
+                <p className="text-[10px] text-zinc-600 mt-2 italic">This helps your shadow better evaluate incoming risks.</p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3">Monitoring Mode</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['audio', 'text', 'both'] as const).map((m) => (
+                    <button
+                      key={m}
+                      onClick={() => setMonitoringMode(m)}
+                      className={`py-3 rounded-xl border text-[10px] font-black uppercase transition-all ${monitoringMode === m ? 'bg-white text-black border-white' : 'bg-black text-zinc-500 border-zinc-800 hover:border-zinc-700'}`}
+                    >
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <button
+                onClick={startMonitoring}
+                disabled={status === 'connecting'}
+                className="w-full py-5 bg-white text-black font-black rounded-full hover:scale-105 active:scale-95 transition-all mt-4"
+              >
+                {status === 'connecting' ? 'CONNECTING...' : 'INITIATE BLACK-BOX'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {activeTab === "black-box" && (
         <main className="flex-1 flex flex-col pt-24 pb-12 px-4 max-w-4xl mx-auto w-full">
           {!isMonitoring ? (
@@ -312,13 +506,21 @@ export default function Home() {
                 <h2 className="text-xl font-bold mb-4 bg-gradient-to-r from-white to-zinc-500 bg-clip-text text-transparent">The Safety Shadow</h2>
                 <p className="text-zinc-400 text-sm">Conversational guardian for high-stakes events. Real-time risk evaluation as you speak.</p>
               </div>
-              <button onClick={startMonitoring} disabled={status === 'connecting'} className="px-10 py-5 bg-white text-black font-black rounded-full hover:scale-105 active:scale-95 transition-all">INITIATE BLACK-BOX</button>
+              <button onClick={() => {
+                setSessionContext("");
+                setMonitoringMode("both");
+                setShowInitiationModal(true);
+              }} disabled={status === 'connecting'} className="px-10 py-5 bg-white text-black font-black rounded-full hover:scale-105 active:scale-95 transition-all">INITIATE BLACK-BOX</button>
+              {status === "error" && (
+                <p className="mt-4 text-red-500 text-xs font-bold uppercase tracking-widest animate-pulse">Connection Failed. Please check console for details.</p>
+              )}
             </div>
           ) : (
             <div className="flex-1 flex flex-col">
               <div className="flex items-center justify-between mb-8 p-6 bg-zinc-900/30 border border-zinc-800 rounded-2xl backdrop-blur-sm">
                 <div>
                   <h3 className={`text-xl font-bold ${risk > 75 ? 'text-red-500' : 'text-zinc-100'}`}>{action}</h3>
+                  {sessionContext && <p className="text-xs text-zinc-500 mt-1 italic line-clamp-1">Context: {sessionContext}</p>}
                 </div>
                 <div className="text-right ml-6">
                   <span className="text-4xl font-black">{risk.toFixed(0)}%</span>
@@ -338,6 +540,10 @@ export default function Home() {
               </form>
               <footer className="sticky bottom-0 bg-black/80 backdrop-blur-md pt-4 border-t border-zinc-900/50 flex items-center justify-between">
                 <button onClick={stopMonitoring} className="px-6 py-3 bg-red-950/20 border border-red-500/20 text-red-500 text-sm font-bold rounded-xl hover:bg-red-500 hover:text-white transition-all">Terminate Session</button>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black uppercase text-zinc-600 tracking-widest">Monitoring Mode:</span>
+                  <span className="text-[10px] font-black uppercase text-white tracking-widest bg-zinc-900 px-3 py-1 rounded-full">{monitoringMode}</span>
+                </div>
               </footer>
             </div>
           )}
@@ -357,6 +563,11 @@ export default function Home() {
                     <code className="text-xs text-zinc-300">{h.id}</code>
                     <span className="text-[10px] font-bold text-zinc-600">{new Date(h.created_at).toLocaleString()}</span>
                   </div>
+                  {h.initial_context && (
+                    <div className="mb-4 p-3 bg-black/50 border border-zinc-800 rounded-xl text-xs text-zinc-500 italic">
+                      &quot;{h.initial_context}&quot;
+                    </div>
+                  )}
                   <div className="space-y-2">
                     {h.logs?.slice(0, 3).map((l: any, i: number) => (<div key={i} className="text-sm text-zinc-400 line-clamp-1 border-l border-zinc-700 pl-3"><span className="text-[10px] font-mono mr-2 text-zinc-600">{l.speaker_label || 'USER'}:</span>{l.content}</div>))}
                   </div>
@@ -401,18 +612,29 @@ export default function Home() {
               <p className="text-zinc-500 text-sm mb-6">Users who have added you as their safety contact.</p>
               <div className="grid grid-cols-1 gap-4">
                 {guarding.length === 0 ? <div className="p-12 border-2 border-dashed border-zinc-900 rounded-3xl text-center text-zinc-600 italic">You aren&apos;t guarding anyone yet.</div> :
-                  guarding.map((p, i) => (
-                    <div key={i} className="bg-zinc-100/[0.03] border border-zinc-800/50 rounded-3xl p-6 flex items-center justify-between group transition-all hover:bg-zinc-900">
-                      <div className="flex items-center gap-4">
-                        <div className="h-12 w-12 rounded-full bg-zinc-800 flex items-center justify-center font-black text-zinc-500 group-hover:text-white uppercase">{p.full_name?.charAt(0) || p.email.charAt(0)}</div>
-                        <div><h4 className="font-bold text-zinc-100">{p.full_name || "Anonymous User"}</h4><p className="text-xs text-zinc-500 font-mono">{p.email}</p></div>
+                  guarding.map((rel, i) => {
+                    const p = rel.profiles;
+                    if (!p) return null;
+                    return (
+                      <div key={rel.id} className="bg-zinc-100/[0.03] border border-zinc-800/50 rounded-3xl p-6 flex items-center justify-between group transition-all hover:bg-zinc-900">
+                        <div className="flex items-center gap-4">
+                          <div className="h-12 w-12 rounded-full bg-zinc-800 flex items-center justify-center font-black text-zinc-500 group-hover:text-white uppercase">{p.full_name?.charAt(0) || p.email.charAt(0)}</div>
+                          <div>
+                            <h4 className="font-bold text-zinc-100">{p.full_name || "Anonymous User"}</h4>
+                            <p className="text-xs text-zinc-500 font-mono mb-1">{p.email}</p>
+                            <span className={`text-[10px] font-bold uppercase ${rel.status === 'active' ? 'text-green-500' : 'text-yellow-500'}`}>{rel.status}</span>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          {rel.status === 'pending' ? (
+                            <button onClick={() => handleAcceptGuardian(rel.id)} className="px-4 py-2 bg-white text-black text-[10px] font-black rounded-full hover:scale-105 transition-all uppercase">Accept Request</button>
+                          ) : (
+                            <button className="text-[10px] font-black text-white hover:underline uppercase transition-all">Live Status</button>
+                          )}
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <span className="text-[10px] font-bold text-green-500 uppercase tracking-widest mb-1 block">Active</span>
-                        <button className="text-[10px] font-black text-white hover:underline uppercase transition-all">Live Status</button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
               </div>
             </div>
           </div>
