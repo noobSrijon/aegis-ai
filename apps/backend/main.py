@@ -9,11 +9,10 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client, Client
 from supabase.lib.client_options import ClientOptions
-
 import assemblyai as aai
 from auth_utils import get_current_user
 from fastapi import Depends
-
+load_dotenv()
 # Setup Supabase
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
@@ -51,7 +50,7 @@ async def read_root():
 
 @app.get('/settings')
 async def get_settings():
-    return {"settings": {}}
+    
 
 @app.get("/api/health")
 async def health_check():
