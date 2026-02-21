@@ -112,7 +112,9 @@ async def monitor_audio(websocket: WebSocket, thread_id: str = "default"):
                         "content": sentence,
                         "thread_id": thread_id,
                         "latitude": lat,
-                        "longitude": lon
+                        "longitude": lon,
+                        "speaker_label": "Speaker_A",
+                        "is_primary_user": True
                     }).execute()
                 except Exception as e:
                     print(f"Supabase error: {e}")
@@ -161,7 +163,9 @@ async def monitor_audio(websocket: WebSocket, thread_id: str = "default"):
     client.on(StreamingEvents.Termination, on_terminated)
 
     client.connect(
-        StreamingParameters(sample_rate=16000)
+        StreamingParameters(
+            sample_rate=16000
+        )
     )
 
     # Generator to yield audio from the queue to the client
@@ -208,7 +212,9 @@ async def monitor_audio(websocket: WebSocket, thread_id: str = "default"):
                                         "content": text,
                                         "thread_id": thread_id,
                                         "latitude": lat,
-                                        "longitude": lon
+                                        "longitude": lon,
+                                        "speaker_label": "Speaker_A",
+                                        "is_primary_user": True
                                     }).execute()
                                 except Exception as e:
                                     print(f"Supabase error: {e}")

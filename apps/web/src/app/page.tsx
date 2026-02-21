@@ -30,11 +30,8 @@ export default function Home() {
     e.preventDefault();
     if (!manualInput.trim() || ws.current?.readyState !== WebSocket.OPEN) return;
 
-    ws.current.send(JSON.stringify({
-      type: "chat",
-      text: manualInput.trim()
-    }));
-
+    // Optimistic update for UI snappiness
+    setTranscripts(prev => [...prev, manualInput.trim()].slice(-20));
     setManualInput("");
   };
 
@@ -88,8 +85,6 @@ export default function Home() {
 
         if (msg.transcript) {
           if (msg.is_final) {
-            // Only add if it's not a manual message we just sent (to avoid duplicates if we used optimistic)
-            // Or better: just let the backend be the source of truth and remove optimistic UI for now
             setTranscripts((prev) => [...prev, msg.transcript].slice(-20));
             setCurrentTranscript("");
           } else {
