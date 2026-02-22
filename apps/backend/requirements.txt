@@ -5,7 +5,6 @@ supabase==2.23.0
 python-dotenv
 assemblyai
 pyannote.audio
-torch
 librosa
 numpy
 python-multipart

@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, File, UploadFile, Body, Query
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, File, UploadFile, Body, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client, Client
 from supabase.lib.client_options import ClientOptions
