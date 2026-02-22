@@ -4,7 +4,5 @@ google-genai
 supabase==2.23.0
 python-dotenv
 assemblyai
-pyannote.audio
-librosa
 numpy
 python-multipart
