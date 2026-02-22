@@ -12,7 +12,7 @@ from google.genai import types
 
 # User provided project no 211841687108
 client = genai.Client(api_key=os.getenv("GEMINI_KEY_SRIJON"))
-MODEL_ID = "gemini-2.5-pro"
+MODEL_ID = "gemini-2.0-flash"
 
 SYSTEM_PROMPT = """You are a risk triage assistant for real-world user interactions. Your job is to estimate whether an interaction is escalating toward harm (harassment, coercion, threats, stalking, restraint, assault, extortion, self-harm risk, or other imminent safety concerns) based only on the provided conversation text.
 
