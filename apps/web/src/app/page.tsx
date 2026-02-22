@@ -529,21 +529,10 @@ export default function Home() {
           {!isMonitoring ? (
             <div className="flex-1 flex flex-col items-center justify-center text-center px-4">
               <div className="relative mb-16 select-none group">
-                <h1 className="text-7xl md:text-8xl lg:text-9xl font-black tracking-tighter leading-none relative">
-                  <span className="absolute inset-0 steel-border opacity-70 blur-[2px] group-hover:opacity-100 transition-opacity duration-500" aria-hidden="true">
-                    Aegis AI
-                  </span>
-                  <span className="relative text-slate-900 group-hover:text-black transition-colors duration-500">
-                    Aegis AI
-                  </span>
+                <h1 className="text-7xl md:text-8xl lg:text-9xl font-black tracking-tighter leading-none relative text-slate-900">
+                  Aegis AI
                 </h1>
-                <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-4 w-full justify-center">
-                  <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-primary/20 to-transparent max-w-[100px]" />
-                  <p className="text-[10px] font-black uppercase tracking-[0.5em] text-slate-400 bg-white/50 backdrop-blur px-4 py-1.5 rounded-full border border-white/50 whitespace-nowrap">
-                    Conversational Guardian
-                  </p>
-                  <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-primary/20 to-transparent max-w-[100px]" />
-                </div>
+
               </div>
 
               <p className="text-slate-500 text-lg md:text-xl leading-relaxed max-w-2xl mb-12 font-medium">
@@ -819,10 +808,10 @@ export default function Home() {
 
       {showAddGuardianModal && (
         <div className="fixed inset-0 z-[100] bg-slate-900/10 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowAddGuardianModal(false)}>
-          <div className="max-w-md w-full bg-[#0F172A] border border-[#0F766E]/30 rounded-[32px] p-8 shadow-[0_32px_80px_rgba(0,0,0,0.6)] animate-in fade-in zoom-in duration-300" onClick={e => e.stopPropagation()}>
+          <div className="max-w-md w-full bg-surface border border-border rounded-[32px] p-8 shadow-2xl animate-in fade-in zoom-in duration-300" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-black flex items-center gap-3">
-                <span className="w-1.5 h-6 bg-[#14B8A6] rounded-full" />
+              <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3">
+                <span className="w-1.5 h-6 bg-primary rounded-full" />
                 Add Guardian
               </h2>
               <button onClick={() => setShowAddGuardianModal(false)} className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-900 transition-colors border border-border">
@@ -831,21 +820,30 @@ export default function Home() {
             </div>
             <p className="text-slate-500 text-sm mb-8 leading-relaxed">They will receive an alert if your risk levels spike during a session.</p>
             <form onSubmit={handleAddGuardian} className="space-y-4">
-              <input type="email" required placeholder="Guardian Email" value={guardianEmail} onChange={(e) => setGuardianEmail(e.target.value)} className="w-full bg-slate-50 border border-border rounded-xl px-4 py-3 text-sm focus:border-primary outline-none text-slate-900 transition-all" />
-              <input type="tel" placeholder="Guardian Phone" value={guardianPhone} onChange={(e) => setGuardianPhone(e.target.value)} className="w-full bg-slate-50 border border-border rounded-xl px-4 py-3 text-sm focus:border-primary outline-none text-slate-900 transition-all" />
-              <button
-                disabled={isSubmittingGuardian}
-                className="w-full py-4 bg-primary text-white rounded-full font-black hover:bg-teal-bright hover:scale-105 transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20 disabled:opacity-50"
-              >
-                {isSubmittingGuardian ? (
-                  <>
-                    <div className="h-4 w-4 border-2 border-[#0B1120]/20 border-t-[#0B1120] rounded-full animate-spin" />
-                    ADDING...
-                  </>
-                ) : (
-                  "ADD GUARDIAN"
-                )}
-              </button>
+              <input type="email" required placeholder="Guardian Email" value={guardianEmail} onChange={(e) => setGuardianEmail(e.target.value)} className="w-full bg-slate-50 border border-border rounded-xl px-4 py-3 text-sm focus:border-primary outline-none text-slate-900 placeholder:text-slate-400 transition-all" />
+              <input type="tel" placeholder="Guardian Phone (optional)" value={guardianPhone} onChange={(e) => setGuardianPhone(e.target.value)} className="w-full bg-slate-50 border border-border rounded-xl px-4 py-3 text-sm focus:border-primary outline-none text-slate-900 placeholder:text-slate-400 transition-all" />
+              <div className="pt-2 space-y-3">
+                <button
+                  disabled={isSubmittingGuardian}
+                  className="w-full py-4 bg-primary text-white rounded-full font-black hover:bg-teal-bright hover:scale-105 transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20 disabled:opacity-50"
+                >
+                  {isSubmittingGuardian ? (
+                    <>
+                      <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ADDING...
+                    </>
+                  ) : (
+                    "ADD GUARDIAN"
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAddGuardianModal(false)}
+                  className="w-full py-3 text-slate-400 font-bold hover:text-slate-600 transition-all uppercase text-[10px] tracking-widest"
+                >
+                  CANCEL
+                </button>
+              </div>
             </form>
           </div>
         </div>
