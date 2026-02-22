@@ -7,21 +7,12 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const supabase = createClient();
 
-  const getURL = () => {
-    let url =
-      process.env.NEXT_PUBLIC_SITE_URL ??
-      window.location.origin;
-    url = url.includes('http') ? url : `https://${url}`;
-    url = url.endsWith('/') ? url : `${url}/`;
-    return url;
-  };
-
   const handleGoogleLogin = async () => {
     setLoading(true);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${getURL()}auth/callback`,
+        redirectTo: `${window.location.origin}/auth/callback`,
       },
     });
 
