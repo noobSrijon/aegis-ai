@@ -95,12 +95,15 @@ async def monitor_audio(websocket: WebSocket, thread_id: str):
         lat, lon = session_location["lat"], session_location["lon"]
 
         async def process():
-            if is_final and supabase:
-                supabase.table("logs").insert(
-                    {"thread_id": thread_id, "content": sentence, "latitude": lat, "longitude": lon}).execute()
-            mock_risk = 95 if "help" in sentence.lower() else (45 if "risk" in sentence.lower() else 10)
-            await websocket.send_json(
-                {"transcript": sentence, "is_final": is_final, "risk": mock_risk, "action": "Analyzing..."})
+            try:
+                if is_final and supabase:
+                    supabase.table("logs").insert(
+                        {"thread_id": thread_id, "content": sentence, "latitude": lat, "longitude": lon}).execute()
+                mock_risk = 95 if "help" in sentence.lower() else (45 if "risk" in sentence.lower() else 10)
+                await websocket.send_json(
+                    {"transcript": sentence, "is_final": is_final, "risk": mock_risk, "action": "Analyzing..."})
+            except Exception as e:
+                print(f"WS SEND ERROR: {e}")
 
         asyncio.run_coroutine_threadsafe(process(), loop)
 
@@ -123,6 +126,10 @@ async def monitor_audio(websocket: WebSocket, thread_id: str):
     try:
         while True:
             data = await websocket.receive()
+            if data.get("type") == "websocket.disconnect":
+                print(f"WS DISCONNECT MESSAGE RECEIVED: {thread_id}")
+                break
+            
             if "bytes" in data:
                 audio_queue.put(data["bytes"])
             elif "text" in data:

@@ -508,11 +508,11 @@ export default function Home() {
                 <input type="text" value={manualInput} onChange={(e) => setManualInput(e.target.value)} placeholder="Send silent context..." className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-white/20 transition-all pr-12" />
                 <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-zinc-500 hover:text-white"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg></button>
               </form>
-              <footer className="sticky bottom-0 bg-black/80 backdrop-blur-md pt-4 border-t border-zinc-900/50 flex items-center justify-between">
+              <footer className="sticky bottom-0 bg-[#070F1A]/80 backdrop-blur-md pt-4 border-t border-[#0F766E]/20 flex items-center justify-between">
                 <button onClick={stopMonitoring} className="px-6 py-3 bg-red-950/20 border border-red-500/20 text-red-500 text-sm font-bold rounded-xl hover:bg-red-500 hover:text-white transition-all">Terminate Session</button>
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-black uppercase text-zinc-600 tracking-widest">Monitoring Mode:</span>
-                  <span className="text-[10px] font-black uppercase text-white tracking-widest bg-zinc-900 px-3 py-1 rounded-full">{monitoringMode}</span>
+                  <span className="text-[10px] font-black uppercase text-[#0F766E]/60 tracking-widest">Monitoring Mode:</span>
+                  <span className="text-[10px] font-black uppercase text-[#14B8A6] tracking-widest bg-[#14B8A6]/10 border border-[#14B8A6]/20 px-3 py-1 rounded-full uppercase">{monitoringMode}</span>
                 </div>
               </footer>
             </div>
