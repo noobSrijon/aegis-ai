@@ -1,6 +1,6 @@
 fastapi
 uvicorn
-groq
+google-genai
 supabase==2.23.0
 python-dotenv
 assemblyai

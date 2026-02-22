@@ -977,24 +977,24 @@ export default function Home() {
                             fetchWardThreads(p.id, p.full_name || p.email);
                           }
                         }}
-                        className={`bg-surface border border-border rounded-[24px] p-6 flex items-center justify-between group transition-all hover:border-primary/30 shadow-sm ${rel.status !== 'pending' ? 'cursor-pointer' : ''}`}
+                        className={`bg-surface border border-border rounded-[24px] p-6 flex items-center justify-between gap-4 group transition-all hover:border-primary/30 shadow-sm ${rel.status !== 'pending' ? 'cursor-pointer' : ''}`}
                       >
-                        <div className="flex items-center gap-5">
-                          <div className="h-14 w-14 rounded-2xl bg-slate-50 border border-border flex items-center justify-center font-black text-slate-400 group-hover:text-primary uppercase transition-colors">{p.full_name?.charAt(0) || p.email.charAt(0)}</div>
-                          <div>
-                            <h4 className="font-bold text-slate-900 text-lg">{p.full_name || "Anonymous User"}</h4>
-                            <p className="text-[10px] text-slate-500 font-mono tracking-wider opacity-60">{p.email}</p>
+                        <div className="flex items-center gap-5 min-w-0">
+                          <div className="h-14 w-14 rounded-2xl bg-slate-50 border border-border flex items-center justify-center font-black text-slate-400 group-hover:text-primary uppercase transition-colors flex-shrink-0">{p.full_name?.charAt(0) || p.email.charAt(0)}</div>
+                          <div className="min-w-0">
+                            <h4 className="font-bold text-slate-900 text-lg truncate">{p.full_name || "Anonymous User"}</h4>
+                            <p className="text-[10px] text-slate-500 font-mono tracking-wider opacity-60 truncate">{p.email}</p>
                             <span className={`text-[10px] font-black uppercase tracking-[0.2em] mt-2 block ${rel.status === 'active' ? 'text-primary' : 'text-accent-warm'}`}>{rel.status}</span>
                           </div>
                         </div>
-                        <div className="text-right flex items-center gap-4">
+                        <div className="text-right flex items-center gap-3 flex-shrink-0">
                           {rel.status === 'pending' ? (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleAcceptGuardian(rel.id);
                               }}
-                              className="px-5 py-2.5 bg-primary text-white text-[10px] font-black rounded-full hover:bg-teal-bright hover:scale-105 transition-all uppercase tracking-widest shadow-md"
+                              className="px-5 py-2.5 bg-primary text-white text-[10px] font-black rounded-full hover:bg-teal-bright hover:scale-105 transition-all uppercase tracking-widest shadow-md whitespace-nowrap"
                             >
                               Accept Request
                             </button>
@@ -1004,7 +1004,7 @@ export default function Home() {
                                 e.stopPropagation();
                                 fetchWardThreads(p.id, p.full_name || p.email);
                               }}
-                              className="text-[10px] cursor-pointer font-black text-primary hover:text-teal-bright uppercase transition-all tracking-widest border border-primary/20 bg-primary/5 px-4 py-2 rounded-full"
+                              className="text-[10px] cursor-pointer font-black text-primary hover:text-teal-bright uppercase transition-all tracking-widest border border-primary/20 bg-primary/5 px-4 py-2 rounded-full whitespace-nowrap"
                             >
                               Session History
                             </div>
@@ -1014,7 +1014,7 @@ export default function Home() {
                               e.stopPropagation();
                               handleRemoveGuardian(rel.id);
                             }}
-                            className="p-3 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover:opacity-100"
+                            className="p-3 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover:opacity-100 flex-shrink-0"
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2m-6 9 2 2 4-4" /></svg>
                           </button>

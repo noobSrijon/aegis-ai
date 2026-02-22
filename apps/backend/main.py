@@ -104,29 +104,55 @@ async def monitor_audio(websocket: WebSocket, thread_id: str):
     audio_queue = queue.Queue()
     loop = asyncio.get_running_loop()
     session_location = {"lat": None, "lon": None}
+    message_buffer = []
+    BATCH_SIZE = 2
+    is_connected = True
 
     def on_turn(client, event: TurnEvent):
+        if not is_connected: return
         if not event.transcript: return
         sentence = event.transcript
         is_final = event.end_of_turn
         lat, lon = session_location["lat"], session_location["lon"]
 
         async def process():
+            nonlocal message_buffer
+            if not is_connected: return
             try:
-                if is_final and supabase:
-                    supabase.table("logs").insert(
-                        {"thread_id": thread_id, "content": sentence, "latitude": lat, "longitude": lon}).execute()
-                # Use Groq LLM for risk assessment
-                loc = {"lat": lat, "lon": lon} if (lat is not None and lon is not None) else None
-                result = await assess_danger(sentence, location=loc)
-                risk_score = int(result["score"])
-                if risk_score >= 65:
-                    await websocket.send_json({"risk": risk_score, "action": "Analyzing..."})
-                action_text = result["reason"] or "Analyzing..."
-                await websocket.send_json(
-                    {"transcript": sentence, "is_final": is_final, "risk": risk_score, "action": action_text})
+                if is_final:
+                    if supabase:
+                        supabase.table("logs").insert(
+                            {"thread_id": thread_id, "content": sentence, "latitude": lat, "longitude": lon}).execute()
+                    
+                    message_buffer.append(sentence)
+                    
+                    if len(message_buffer) >= BATCH_SIZE:
+                        # Process all messages in buffer for context
+                        combined_text = "\n".join(message_buffer)
+                        loc = {"lat": lat, "lon": lon} if (lat is not None and lon is not None) else None
+                        
+                        result = await assess_danger(combined_text, location=loc)
+                        risk_score = int(result["score"])
+                        
+                        if not is_connected: return
+                        
+                        if risk_score >= 65:
+                            await websocket.send_json({"risk": risk_score, "action": "Analyzing..."})
+                        
+                        action_text = result["reason"] or "Analyzing..."
+                        # Only send back the latest chunk to avoid duplication, but include risk context
+                        await websocket.send_json(
+                            {"transcript": sentence, "is_final": True, "risk": risk_score, "action": action_text})
+                        
+                        # Clear buffer after assessment
+                        message_buffer = []
+                    else:
+                        # Just send the transcript back without full assessment yet
+                        await websocket.send_json({"transcript": sentence, "is_final": True, "risk": 0})
+
             except Exception as e:
-                print(f"WS SEND ERROR: {e}")
+                if is_connected:
+                    print(f"WS SEND ERROR: {e}")
 
         asyncio.run_coroutine_threadsafe(process(), loop)
 
@@ -134,15 +160,18 @@ async def monitor_audio(websocket: WebSocket, thread_id: str):
         options=StreamingClientOptions(api_key=aai.settings.api_key)
     )
     client.on(StreamingEvents.Turn, on_turn)
-    client.on(StreamingEvents.Error, lambda c, e: print(f"AAI Error: {e}"))
+    client.on(StreamingEvents.Error, lambda c, e: print(f"AAI Error: {e}") if is_connected else None)
 
     client.connect(StreamingParameters(sample_rate=16000))
 
     def audio_generator():
-        while True:
-            chunk = audio_queue.get()
-            if chunk is None: break
-            yield chunk
+        while is_connected:
+            try:
+                chunk = audio_queue.get(timeout=0.1)
+                if chunk is None: break
+                yield chunk
+            except queue.Empty:
+                continue
 
     threading.Thread(target=lambda: client.stream(audio_generator()), daemon=True).start()
 
@@ -163,20 +192,36 @@ async def monitor_audio(websocket: WebSocket, thread_id: str):
                     text = msg.get("text", "").strip()
                     if text:
                         try:
-                            loc = {"lat": session_location["lat"], "lon": session_location["lon"]} if (session_location["lat"] is not None and session_location["lon"] is not None) else None
-                            result = await assess_danger(text, location=loc)
-                            risk_score = int(result["score"])
-                            action_text = result["reason"] or "Analyzed."
-                            await websocket.send_json({"is_final": True, "risk": risk_score, "action": action_text})
+                            message_buffer.append(text)
                             if supabase:
                                 supabase.table("logs").insert({"thread_id": thread_id, "content": text, "latitude": session_location["lat"], "longitude": session_location["lon"]}).execute()
+                            
+                            if len(message_buffer) >= BATCH_SIZE:
+                                combined_text = "\n".join(message_buffer)
+                                loc = {"lat": session_location["lat"], "lon": session_location["lon"]} if (session_location["lat"] is not None and session_location["lon"] is not None) else None
+                                result = await assess_danger(combined_text, location=loc)
+                                risk_score = int(result["score"])
+                                action_text = result["reason"] or "Analyzed."
+                                if is_connected:
+                                    # Send ONLY the current message text to UI, but with the risk result
+                                    await websocket.send_json({"transcript": text, "is_final": True, "risk": risk_score, "action": action_text})
+                                message_buffer = []
+                            else:
+                                if is_connected:
+                                    await websocket.send_json({"transcript": text, "is_final": True, "risk": 0})
                         except Exception as e:
-                            print(f"Chat assess error: {e}")
-                            await websocket.send_json({"transcript": text, "is_final": True, "risk": 0, "action": f"Assessment failed: {e}"})
+                            if is_connected:
+                                print(f"Chat assess error: {e}")
+                                await websocket.send_json({"transcript": text, "is_final": True, "risk": 0, "action": f"Assessment failed: {e}"})
     except WebSocketDisconnect:
         print(f"Disconnected: {thread_id}")
     finally:
+        is_connected = False
         audio_queue.put(None)
+        try:
+            client.close()
+        except:
+            pass
 
 
 @app.get("/api/profile")
