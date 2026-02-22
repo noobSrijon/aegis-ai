@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     full_name TEXT,
     voice_fingerprint VECTOR(384), -- Requires pgvector extension enabled in Supabase
     is_enrolled BOOLEAN DEFAULT false,
+    account_role TEXT DEFAULT 'both', -- 'guardian_only', 'both'
     created_at TIMESTAMPTZ DEFAULT now()
 );
 

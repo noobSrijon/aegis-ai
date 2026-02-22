@@ -165,6 +165,10 @@ async def get_profile_role(user=Depends(get_current_user)):
         return {"account_role": "both"}
 
 
+class RoleUpdate(BaseModel):
+    account_role: str
+
+
 @app.post("/api/profile/role")
 async def update_profile_role(data: RoleUpdate, user=Depends(get_current_user)):
     if not supabase:
