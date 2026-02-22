@@ -33,6 +33,7 @@ export default function Home() {
   const [myGuardians, setMyGuardians] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [isRecording, setIsRecording] = useState(false);
+  const [aiNotifications, setAiNotifications] = useState<{ text: string; risk: number; time: string }[]>([]);
   const [guardianEmail, setGuardianEmail] = useState("");
   const [guardianPhone, setGuardianPhone] = useState("");
   const [isSubmittingGuardian, setIsSubmittingGuardian] = useState(false);
@@ -211,6 +212,7 @@ export default function Home() {
     setCurrentTranscript("");
     setRisk(0);
     setAction("Shadow is idle.");
+    setAiNotifications([]);
 
     setStatus("connecting");
     setShowInitiationModal(false);
@@ -270,8 +272,23 @@ export default function Home() {
       ws.current.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data);
-          setRisk(msg.risk || 0);
-          setAction(msg.action || "Shadow is monitoring...");
+          const newRisk = msg.risk || 0;
+          setRisk(newRisk);
+          const newAction = msg.action || "Shadow is monitoring...";
+          setAction(newAction);
+          // Only push AI notifications when the server explicitly sends a new action field
+          // (not just a transcript message — msg.action must be present and non-default)
+          if (msg.action && msg.action !== "Shadow is monitoring..." && msg.action !== "Shadow is idle.") {
+            setAiNotifications(prev => {
+              // Deduplicate: Don't add if the same message was the last one added
+              if (prev.length > 0 && prev[0].text === msg.action) {
+                return prev;
+              }
+              const now = new Date();
+              const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+              return [{ text: msg.action, risk: newRisk, time: timeStr }, ...prev].slice(0, 50);
+            });
+          }
           if (msg.transcript) {
             if (msg.is_final) {
               setTranscripts((prev) => [...prev, msg.transcript].slice(-20));
@@ -468,7 +485,8 @@ export default function Home() {
       )}
 
       {!isLoading && activeTab === "black-box" && (
-        <main className="flex-1 flex flex-col pt-24 pb-12 px-4 max-w-4xl mx-auto w-full relative z-10">
+        <main className={`flex-1 flex flex-col mx-auto w-full relative z-10 ${isMonitoring ? 'max-w-7xl h-screen overflow-hidden' : 'max-w-4xl pt-24 pb-12'}`}>
+          {isMonitoring && <div className="h-24 flex-shrink-0" />} {/* Spacer for fixed nav */}
           {!isMonitoring ? (
             <div className="flex-1 flex flex-col items-center justify-center text-center">
               <div className="mb-8 p-4 rounded-2xl bg-[#0F172A]/50 border border-[#0F766E]/30 max-w-lg shadow-[0_24px_60px_rgba(0,0,0,0.5)]">
@@ -495,33 +513,115 @@ export default function Home() {
               )}
             </div>
           ) : (
-            <div className="flex-1 flex flex-col">
-              <div className="flex items-center justify-between mb-8 p-6 bg-zinc-900/30 border border-zinc-800 rounded-2xl backdrop-blur-sm">
-                <div>
-                  <h3 className={`text-xl font-bold ${risk > 75 ? 'text-red-500' : 'text-zinc-100'}`}>{action}</h3>
-                  {sessionContext && <p className="text-xs text-zinc-500 mt-1 italic line-clamp-1">Context: {sessionContext}</p>}
+            <div className="flex-1 flex flex-col min-h-0 px-4 pb-6 overflow-hidden">
+              {/* Risk Header Bar */}
+              <div className="flex items-center justify-between mb-4 p-4 bg-zinc-900/30 border border-zinc-800 rounded-2xl backdrop-blur-sm flex-shrink-0">
+                <div className="flex-1 mr-4">
+                  <h3 className={`text-base font-bold line-clamp-1 ${risk > 75 ? 'text-red-500' : 'text-zinc-100'}`}>{action}</h3>
+                  {sessionContext && <p className="text-xs text-zinc-500 mt-0.5 italic line-clamp-1">Context: {sessionContext}</p>}
                 </div>
-                <div className="text-right ml-6">
-                  <span className="text-4xl font-black">{risk.toFixed(0)}%</span>
-                  <div className="w-24 bg-zinc-800 h-1 mt-2 rounded-full overflow-hidden">
-                    <div className={`h-full transition-all duration-1000 ${risk > 75 ? 'bg-red-500' : 'bg-green-500'}`} style={{ width: `${risk}%` }} />
+                <div className="text-right flex-shrink-0">
+                  <span className={`text-3xl font-black ${risk > 75 ? 'text-red-500' : risk > 40 ? 'text-amber-400' : 'text-[#14B8A6]'}`}>{risk.toFixed(0)}%</span>
+                  <div className="w-20 bg-zinc-800 h-1 mt-1.5 rounded-full overflow-hidden">
+                    <div className={`h-full transition-all duration-1000 ${risk > 75 ? 'bg-red-500' : risk > 40 ? 'bg-amber-400' : 'bg-[#14B8A6]'}`} style={{ width: `${risk}%` }} />
                   </div>
                 </div>
               </div>
-              <div className="flex-1 space-y-4 overflow-y-auto mb-4 pr-2 custom-scrollbar">
-                {transcripts.map((t, i) => (<div key={i} className="flex flex-col items-end gap-1 ml-auto max-w-[85%]"><div className="px-4 py-3 rounded-2xl rounded-tr-none bg-white/5 border border-zinc-800/50 text-zinc-200 text-sm leading-relaxed">{t}</div></div>))}
-                {currentTranscript && <div className="flex flex-col items-end gap-1 ml-auto max-w-[85%] animate-pulse"><div className="px-4 py-3 rounded-2xl rounded-tr-none bg-zinc-900/50 border border-zinc-800/30 text-zinc-400 text-sm italic">{currentTranscript}...</div></div>}
-                <div ref={chatEndRef} />
+
+              {/* Two-Panel Layout */}
+              <div className="flex-1 flex flex-col lg:flex-row gap-4 min-h-0 overflow-hidden">
+
+                {/* LEFT PANEL — Chat Window */}
+                <div className="w-full lg:w-96 flex flex-col min-h-0 min-w-0">
+                  {/* Transcript Feed */}
+                  <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-1 mb-3">
+                    {transcripts.length === 0 && !currentTranscript && (
+                      <div className="h-full flex flex-col items-center justify-center gap-3 text-center">
+                        <div className="w-12 h-12 rounded-full bg-[#0F766E]/10 border border-[#0F766E]/20 flex items-center justify-center">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#14B8A6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" y1="19" x2="12" y2="23" /><line x1="8" y1="23" x2="16" y2="23" /></svg>
+                        </div>
+                        <p className="text-[12px] text-[#9CA3AF]/60 leading-relaxed">Listening... Speak or type to begin</p>
+                      </div>
+                    )}
+                    {transcripts.map((t, i) => (
+                      <div key={i} className="flex flex-col items-end gap-1 ml-auto max-w-[90%]">
+                        <div className="px-4 py-3 rounded-2xl rounded-tr-none bg-white/5 border border-zinc-800/50 text-zinc-200 text-sm leading-relaxed">{t}</div>
+                      </div>
+                    ))}
+                    {currentTranscript && (
+                      <div className="flex flex-col items-end gap-1 ml-auto max-w-[90%] animate-pulse">
+                        <div className="px-4 py-3 rounded-2xl rounded-tr-none bg-zinc-900/50 border border-zinc-800/30 text-zinc-400 text-sm italic">{currentTranscript}...</div>
+                      </div>
+                    )}
+                    <div ref={chatEndRef} />
+                  </div>
+
+                  {/* Text Input */}
+                  <form onSubmit={sendManualChat} className="relative flex-shrink-0">
+                    <input
+                      type="text"
+                      value={manualInput}
+                      onChange={(e) => setManualInput(e.target.value)}
+                      placeholder="Send silent context to Shadow..."
+                      className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#14B8A6]/40 transition-all pr-12"
+                    />
+                    <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-zinc-500 hover:text-[#14B8A6] transition-colors">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                    </button>
+                  </form>
+                </div>
+
+                {/* RIGHT PANEL — AI Notifications & Suggestions */}
+                <div className="flex-1 flex flex-col min-h-0 bg-[#0A1628]/60 border border-[#0F766E]/25 rounded-2xl overflow-hidden min-w-0">
+                  <div className="flex items-center gap-2 px-4 py-3 border-b border-[#0F766E]/20 bg-[#0F172A]/60 flex-shrink-0">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#14B8A6] opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-[#14B8A6]" />
+                    </span>
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#0F766E]">AI Insights</span>
+                  </div>
+                  <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-2">
+                    {aiNotifications.length === 0 ? (
+                      <div className="h-full flex flex-col items-center justify-center gap-3 text-center px-4">
+                        <div className="w-10 h-10 rounded-full bg-[#0F766E]/10 border border-[#0F766E]/20 flex items-center justify-center">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#14B8A6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 5v5l4 2" /></svg>
+                        </div>
+                        <p className="text-[11px] text-[#9CA3AF]/60 leading-relaxed">AI insights will appear here as Shadow monitors the session</p>
+                      </div>
+                    ) : (
+                      aiNotifications.map((notif, i) => (
+                        <div
+                          key={i}
+                          className={`p-3 rounded-xl border text-xs leading-relaxed transition-all ${
+                            notif.risk > 75
+                              ? 'bg-red-950/20 border-red-500/25 text-red-300'
+                              : notif.risk > 40
+                              ? 'bg-amber-950/20 border-amber-500/25 text-amber-300'
+                              : 'bg-[#0F172A]/60 border-[#0F766E]/20 text-[#9CA3AF]'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className={`text-[9px] font-black uppercase tracking-widest ${
+                              notif.risk > 75 ? 'text-red-400' : notif.risk > 40 ? 'text-amber-400' : 'text-[#14B8A6]'
+                            }`}>
+                              {notif.risk > 75 ? '⚠ HIGH RISK' : notif.risk > 40 ? '⚡ ELEVATED' : '✦ INSIGHT'}
+                            </span>
+                            <span className="text-[9px] text-zinc-600 font-mono">{notif.time}</span>
+                          </div>
+                          {notif.text}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
               </div>
-              <form onSubmit={sendManualChat} className="mb-6 relative">
-                <input type="text" value={manualInput} onChange={(e) => setManualInput(e.target.value)} placeholder="Send silent context..." className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-white/20 transition-all pr-12" />
-                <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-zinc-500 hover:text-white"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg></button>
-              </form>
-              <footer className="sticky bottom-0 bg-[#070F1A]/80 backdrop-blur-md pt-4 border-t border-[#0F766E]/20 flex items-center justify-between">
+
+              {/* Footer */}
+              <footer className="flex-shrink-0 mt-4 pt-4 border-t border-[#0F766E]/20 flex items-center justify-between">
                 <button onClick={stopMonitoring} className="px-6 py-3 bg-red-950/20 border border-red-500/20 text-red-500 text-sm font-bold rounded-xl hover:bg-red-500 hover:text-white transition-all">Terminate Session</button>
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-black uppercase text-[#0F766E]/60 tracking-widest">Monitoring Mode:</span>
-                  <span className="text-[10px] font-black uppercase text-[#14B8A6] tracking-widest bg-[#14B8A6]/10 border border-[#14B8A6]/20 px-3 py-1 rounded-full uppercase">{monitoringMode}</span>
+                  <span className="text-[10px] font-black uppercase text-[#0F766E]/60 tracking-widest">Mode:</span>
+                  <span className="text-[10px] font-black uppercase text-[#14B8A6] tracking-widest bg-[#14B8A6]/10 border border-[#14B8A6]/20 px-3 py-1 rounded-full">{monitoringMode}</span>
                 </div>
               </footer>
             </div>
@@ -608,13 +708,16 @@ export default function Home() {
 
             <div className="space-y-6">
               <div>
-                <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-[#0F766E] mb-3">SITUATION CONTEXT</label>
+                <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-[#0F766E] mb-3">SITUATION CONTEXT <span className="text-[#FF8559] ml-1">*</span></label>
                 <textarea
                   placeholder="e.g. Walking home late at night..."
                   value={sessionContext}
                   onChange={(e) => setSessionContext(e.target.value)}
-                  className="w-full bg-[#070F1A] border border-[#0F766E]/20 rounded-2xl p-5 text-sm focus:border-[#14B8A6] outline-none h-32 resize-none leading-relaxed transition-all placeholder:text-zinc-800"
+                  className={`w-full bg-[#070F1A] border rounded-2xl p-5 text-sm focus:border-[#14B8A6] outline-none h-32 resize-none leading-relaxed transition-all placeholder:text-zinc-800 ${sessionContext.trim() ? 'border-[#0F766E]/20' : 'border-[#FF8559]/30'}`}
                 />
+                {!sessionContext.trim() && (
+                  <p className="mt-2 text-[10px] text-[#FF8559]/70 font-semibold">Required — describe your situation so Shadow can protect you.</p>
+                )}
               </div>
 
               <div>
@@ -638,8 +741,12 @@ export default function Home() {
               <div className="pt-4 space-y-3">
                 <button
                   onClick={startMonitoring}
-                  disabled={status === 'connecting'}
-                  className="w-full py-5 bg-[#14B8A6] text-[#0B1120] font-black rounded-full hover:bg-[#22C9B7] hover:scale-[1.02] active:scale-[0.98] transition-all uppercase tracking-[0.15em] shadow-lg shadow-[#14B8A6]/20"
+                  disabled={status === 'connecting' || !sessionContext.trim()}
+                  className={`w-full py-5 font-black rounded-full transition-all uppercase tracking-[0.15em] shadow-lg ${
+                    !sessionContext.trim()
+                      ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed shadow-none'
+                      : 'bg-[#14B8A6] text-[#0B1120] hover:bg-[#22C9B7] hover:scale-[1.02] active:scale-[0.98] shadow-[#14B8A6]/20'
+                  }`}
                 >
                   {status === 'connecting' ? 'CONNECTING...' : 'START BLACK-BOX'}
                 </button>
@@ -779,7 +886,11 @@ export default function Home() {
                     const p = rel.profiles;
                     if (!p) return null;
                     return (
-                      <div key={rel.id} className="bg-[#0F172A]/50 border border-[#0F766E]/20 rounded-[24px] p-6 flex items-center justify-between group transition-all hover:border-[#14B8A6]/30 shadow-lg">
+                      <div 
+                        key={rel.id} 
+                        onClick={() => rel.status !== 'pending' && router.push('/live-status')}
+                        className={`bg-[#0F172A]/50 border border-[#0F766E]/20 rounded-[24px] p-6 flex items-center justify-between group transition-all hover:border-[#14B8A6]/30 shadow-lg ${rel.status !== 'pending' ? 'cursor-pointer' : ''}`}
+                      >
                         <div className="flex items-center gap-5">
                           <div className="h-14 w-14 rounded-2xl bg-[#070F1A] border border-[#0F766E]/20 flex items-center justify-center font-black text-[#9CA3AF] group-hover:text-[#14B8A6] uppercase transition-colors">{p.full_name?.charAt(0) || p.email.charAt(0)}</div>
                           <div>
@@ -790,12 +901,25 @@ export default function Home() {
                         </div>
                         <div className="text-right flex items-center gap-4">
                           {rel.status === 'pending' ? (
-                            <button onClick={() => handleAcceptGuardian(rel.id)} className="px-5 py-2.5 bg-[#14B8A6] text-[#0B1120] text-[10px] font-black rounded-full hover:bg-[#22C9B7] hover:scale-105 transition-all uppercase tracking-widest shadow-lg">Accept Request</button>
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAcceptGuardian(rel.id);
+                              }} 
+                              className="px-5 py-2.5 bg-[#14B8A6] text-[#0B1120] text-[10px] font-black rounded-full hover:bg-[#22C9B7] hover:scale-105 transition-all uppercase tracking-widest shadow-lg"
+                            >
+                              Accept Request
+                            </button>
                           ) : (
-                            <button className="text-[10px] font-black text-[#14B8A6] hover:text-[#22C9B7] uppercase transition-all tracking-widest border border-[#14B8A6]/20 bg-[#14B8A6]/5 px-4 py-2 rounded-full">Live Status</button>
+                          <div className="text-[10px] font-black text-[#14B8A6] hover:text-[#22C9B7] uppercase transition-all tracking-widest border border-[#14B8A6]/20 bg-[#14B8A6]/5 px-4 py-2 rounded-full">
+                            Live Status
+                          </div>
                           )}
                           <button
-                            onClick={() => handleRemoveGuardian(rel.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveGuardian(rel.id);
+                            }}
                             className="p-3 text-[#9CA3AF] hover:text-[#FF8559] hover:bg-[#FF8559]/10 rounded-xl transition-all opacity-0 group-hover:opacity-100"
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2m-6 9 2 2 4-4" /></svg>
