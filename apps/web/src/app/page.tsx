@@ -212,7 +212,6 @@ export default function Home() {
     e.preventDefault();
     if (!manualInput.trim() || ws.current?.readyState !== WebSocket.OPEN) return;
     ws.current.send(JSON.stringify({ type: "chat", text: manualInput.trim() }));
-    setTranscripts(prev => [...prev, manualInput.trim()].slice(-20));
     setManualInput("");
   };
 
@@ -303,22 +302,26 @@ export default function Home() {
       ws.current.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data);
-          const newRisk = msg.risk || 0;
-          setRisk(newRisk);
-          const newAction = msg.action || "Shadow is monitoring...";
-          setAction(newAction);
-          // Only push AI notifications when the server explicitly sends a new action field
-          // (not just a transcript message — msg.action must be present and non-default)
-          if (msg.action && msg.action !== "Shadow is monitoring..." && msg.action !== "Shadow is idle.") {
-            setAiNotifications(prev => {
-              // Deduplicate: Don't add if the same message was the last one added
-              if (prev.length > 0 && prev[0].text === msg.action) {
-                return prev;
-              }
-              const now = new Date();
-              const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-              return [{ text: msg.action, risk: newRisk, time: timeStr }, ...prev].slice(0, 50);
-            });
+
+          if (msg.risk !== undefined) {
+            setRisk(msg.risk);
+          }
+
+          if (msg.action !== undefined) {
+            setAction(msg.action);
+
+            // Only push AI notifications when the server explicitly sends a new action field
+            if (msg.action !== "Shadow is monitoring..." && msg.action !== "Shadow is idle.") {
+              setAiNotifications(prev => {
+                // Deduplicate: Don't add if the same message was the last one added
+                if (prev.length > 0 && prev[0].text === msg.action) {
+                  return prev;
+                }
+                const now = new Date();
+                const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                return [{ text: msg.action, risk: msg.risk || risk, time: timeStr }, ...prev].slice(0, 50);
+              });
+            }
           }
           if (msg.transcript) {
             if (msg.is_final) {
@@ -470,14 +473,14 @@ export default function Home() {
                   onClick={() => setActiveTab("aegis-ai")}
                   className={`px-5 md:px-6 py-3 md:py-2.5 rounded-full text-[10px] font-black uppercase tracking-[0.25em] transition-all duration-300 flex items-center gap-2.5 ${activeTab === "aegis-ai" ? "bg-slate-900 text-white shadow-[0_8px_16px_rgba(0,0,0,0.1)]" : "text-slate-500 hover:text-slate-900 hover:bg-slate-900/5"}`}
                 >
-                  <svg className="w-4 h-4 md:w-3.5 md:h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                  <svg className="w-4 h-4 md:w-3.5 md:h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
                   <span className="hidden md:inline whitespace-nowrap">Aegis AI</span>
                 </button>
                 <button
                   onClick={() => setActiveTab("history")}
                   className={`px-5 md:px-6 py-3 md:py-2.5 rounded-full text-[10px] font-black uppercase tracking-[0.25em] transition-all duration-300 flex items-center gap-2.5 ${activeTab === "history" ? "bg-slate-900 text-white shadow-[0_8px_16px_rgba(0,0,0,0.1)]" : "text-slate-500 hover:text-slate-900 hover:bg-slate-900/5"}`}
                 >
-                  <svg className="w-4 h-4 md:w-3.5 md:h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  <svg className="w-4 h-4 md:w-3.5 md:h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
                   <span className="hidden md:inline whitespace-nowrap">History</span>
                 </button>
               </>
@@ -486,14 +489,14 @@ export default function Home() {
               onClick={() => setActiveTab("guardians")}
               className={`px-5 md:px-6 py-3 md:py-2.5 rounded-full text-[10px] font-black uppercase tracking-[0.25em] transition-all duration-300 flex items-center gap-2.5 ${activeTab === "guardians" ? "bg-slate-900 text-white shadow-[0_8px_16px_rgba(0,0,0,0.1)]" : "text-slate-500 hover:text-slate-900 hover:bg-slate-900/5"}`}
             >
-              <svg className="w-4 h-4 md:w-3.5 md:h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              <svg className="w-4 h-4 md:w-3.5 md:h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
               <span className="hidden md:inline whitespace-nowrap">Guardians</span>
             </button>
             <button
               onClick={() => setActiveTab("notifications")}
               className={`px-5 md:px-6 py-3 md:py-2.5 rounded-full text-[10px] font-black uppercase tracking-[0.25em] transition-all duration-300 flex items-center gap-2.5 relative ${activeTab === "notifications" ? "bg-slate-900 text-white shadow-[0_8px_16px_rgba(0,0,0,0.1)]" : "text-slate-500 hover:text-slate-900 hover:bg-slate-900/5"}`}
             >
-              <svg className="w-4 h-4 md:w-3.5 md:h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+              <svg className="w-4 h-4 md:w-3.5 md:h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></svg>
               <span className="hidden md:inline whitespace-nowrap">Alerts</span>
               {unreadCount > 0 && <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-accent-warm text-[8px] font-black text-white shadow-lg ring-2 ring-white">{unreadCount}</span>}
             </button>
@@ -502,7 +505,7 @@ export default function Home() {
               onClick={() => setActiveTab("profile")}
               className={`px-5 md:px-6 py-3 md:py-2.5 rounded-full text-[10px] font-black uppercase tracking-[0.25em] transition-all duration-300 flex items-center gap-2.5 ${activeTab === "profile" ? "bg-slate-900 text-white shadow-[0_8px_16px_rgba(0,0,0,0.1)]" : "text-slate-500 hover:text-slate-900 hover:bg-slate-900/5"}`}
             >
-              <svg className="w-4 h-4 md:w-3.5 md:h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              <svg className="w-4 h-4 md:w-3.5 md:h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
               <span className="hidden md:inline whitespace-nowrap">Account</span>
             </button>
           </>
@@ -544,7 +547,7 @@ export default function Home() {
               </div>
 
               <p className="text-slate-500 text-lg md:text-xl leading-relaxed max-w-2xl mb-12 font-medium">
-                Real-time risk evaluation for high-stakes events. 
+                Real-time risk evaluation for high-stakes events.
                 <span className="block text-slate-400 text-sm mt-2 font-normal">Advanced AI protection as you speak.</span>
               </p>
 
@@ -648,15 +651,15 @@ export default function Home() {
                         <div
                           key={i}
                           className={`p-3 rounded-xl border text-xs leading-relaxed transition-all shadow-sm ${notif.risk > 75
-                               ? 'bg-red-50 border-red-200 text-red-700'
-                               : notif.risk > 40
-                                 ? 'bg-amber-50 border-amber-200 text-amber-700'
-                                 : 'bg-surface border-border text-slate-600'
-                             }`}
+                            ? 'bg-red-50 border-red-200 text-red-700'
+                            : notif.risk > 40
+                              ? 'bg-amber-50 border-amber-200 text-amber-700'
+                              : 'bg-surface border-border text-slate-600'
+                            }`}
                         >
                           <div className="flex items-center justify-between mb-1.5">
                             <span className={`text-[9px] font-black uppercase tracking-widest ${notif.risk > 75 ? 'text-red-600' : notif.risk > 40 ? 'text-amber-600' : 'text-primary'
-                               }`}>
+                              }`}>
                               {notif.risk > 75 ? '⚠ HIGH RISK' : notif.risk > 40 ? '⚡ ELEVATED' : '✦ INSIGHT'}
                             </span>
                             <span className="text-[9px] text-slate-400 font-mono">{notif.time}</span>
@@ -796,8 +799,8 @@ export default function Home() {
                   onClick={startMonitoring}
                   disabled={status === 'connecting' || !sessionContext.trim()}
                   className={`w-full py-5 font-black rounded-full transition-all uppercase tracking-[0.15em] shadow-lg ${!sessionContext.trim()
-                      ? 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none'
-                      : 'bg-primary text-white hover:bg-teal-bright hover:scale-[1.02] active:scale-[0.98] shadow-primary/20'
+                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none'
+                    : 'bg-primary text-white hover:bg-teal-bright hover:scale-[1.02] active:scale-[0.98] shadow-primary/20'
                     }`}
                 >
                   {status === 'connecting' ? 'CONNECTING...' : 'START AEGIS AI'}

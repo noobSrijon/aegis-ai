@@ -104,9 +104,47 @@ async def monitor_audio(websocket: WebSocket, thread_id: str):
     audio_queue = queue.Queue()
     loop = asyncio.get_running_loop()
     session_location = {"lat": None, "lon": None}
-    message_buffer = []
+
+    # Get initial_context and user_id for alerting
+    user_id = None
+    initial_context = ""
+    if supabase:
+        thread_res = supabase.table("threads").select("user_id", "initial_context").eq("id", thread_id).execute()
+        if thread_res.data:
+            user_id = thread_res.data[0]["user_id"]
+            initial_context = thread_res.data[0].get("initial_context", "") or ""
+
+    session_history = []
     BATCH_SIZE = 2
     is_connected = True
+
+    async def trigger_alerts(score: int, reason: str):
+        if not supabase or not user_id: return
+        try:
+            # Fetch active guardians
+            guardians_res = supabase.table("guardians").select("guardian_id").eq("user_id", user_id).eq("status", "active").execute()
+            guardian_ids = [g["guardian_id"] for g in guardians_res.data if g.get("guardian_id")]
+            
+            # Create notifications for guardians
+            for g_id in guardian_ids:
+                supabase.table("notifications").insert({
+                    "user_id": g_id,
+                    "type": "risk_alert",
+                    "title": "CRITICAL RISK ALERT",
+                    "message": f"Critical danger detected for your ward. Risk Score: {score}. Reason: {reason}",
+                    "link": f"/live-status?threadId={thread_id}"
+                }).execute()
+                
+            # Create notification for user
+            supabase.table("notifications").insert({
+                "user_id": user_id,
+                "type": "risk_alert",
+                "title": "Safety Alert",
+                "message": "Shadow has detected potential danger. Please stay alert.",
+                "link": "/"
+            }).execute()
+        except Exception as alert_err:
+            print(f"ALERT SEND ERROR: {alert_err}")
 
     def on_turn(client, event: TurnEvent):
         if not is_connected: return
@@ -116,39 +154,61 @@ async def monitor_audio(websocket: WebSocket, thread_id: str):
         lat, lon = session_location["lat"], session_location["lon"]
 
         async def process():
-            nonlocal message_buffer
+            nonlocal session_history
             if not is_connected: return
             try:
                 if is_final:
+                    # 1. IMMEDIATE ECHO (Zero Lag)
+                    await websocket.send_json({"transcript": sentence, "is_final": True})
+                    
+                    # 2. Database Logging (Background)
                     if supabase:
-                        supabase.table("logs").insert(
-                            {"thread_id": thread_id, "content": sentence, "latitude": lat, "longitude": lon}).execute()
+                        def log_to_db():
+                            supabase.table("logs").insert({"thread_id": thread_id, "content": sentence, "latitude": lat, "longitude": lon}).execute()
+                        threading.Thread(target=log_to_db, daemon=True).start()
                     
-                    message_buffer.append(sentence)
+                    session_history.append(sentence)
                     
-                    if len(message_buffer) >= BATCH_SIZE:
-                        # Process all messages in buffer for context
-                        combined_text = "\n".join(message_buffer)
-                        loc = {"lat": lat, "lon": lon} if (lat is not None and lon is not None) else None
-                        
-                        result = await assess_danger(combined_text, location=loc)
-                        risk_score = int(result["score"])
-                        
-                        if not is_connected: return
-                        
-                        if risk_score >= 65:
-                            await websocket.send_json({"risk": risk_score, "action": "Analyzing..."})
-                        
-                        action_text = result["reason"] or "Analyzing..."
-                        # Only send back the latest chunk to avoid duplication, but include risk context
-                        await websocket.send_json(
-                            {"transcript": sentence, "is_final": True, "risk": risk_score, "action": action_text})
-                        
-                        # Clear buffer after assessment
-                        message_buffer = []
-                    else:
-                        # Just send the transcript back without full assessment yet
-                        await websocket.send_json({"transcript": sentence, "is_final": True, "risk": 0})
+                    # 3. BACKGROUND ASSESSMENT
+                    if len(session_history) >= BATCH_SIZE:
+                        async def run_assessment(history_snapshot, current_sentence):
+                            if not is_connected: return
+                            try:
+                                full_context = f"Initial Context: {initial_context}\n\nTranscript:\n" + "\n".join(history_snapshot)
+                                loc = {"lat": lat, "lon": lon} if (lat is not None and lon is not None) else None
+                                
+                                result = await assess_danger(full_context, location=loc)
+                                risk_score = int(result["score"])
+                                risk_level = result["level"]
+                                action_text = result["reason"] or "Analyzing..."
+
+                                # Persist risk score
+                                if supabase:
+                                    supabase.table("risk_scores").insert({
+                                        "thread_id": thread_id,
+                                        "score": risk_score,
+                                        "level": risk_level,
+                                        "reason": action_text
+                                    }).execute()
+
+                                # Trigger Alerts
+                                if risk_score >= 75:
+                                    await trigger_alerts(risk_score, action_text)
+                                
+                                # Send follow-up with risk results
+                                if is_connected:
+                                    await websocket.send_json({
+                                        "risk": risk_score, 
+                                        "action": action_text
+                                    })
+                            except Exception as bg_err:
+                                print(f"Background assessment error: {bg_err}")
+
+                        # Take a snapshot of history for this assessment
+                        asyncio.create_task(run_assessment(list(session_history), sentence))
+                else:
+                    # Intermediate transcripts
+                    await websocket.send_json({"transcript": sentence, "is_final": False})
 
             except Exception as e:
                 if is_connected:
@@ -192,27 +252,55 @@ async def monitor_audio(websocket: WebSocket, thread_id: str):
                     text = msg.get("text", "").strip()
                     if text:
                         try:
-                            message_buffer.append(text)
-                            if supabase:
-                                supabase.table("logs").insert({"thread_id": thread_id, "content": text, "latitude": session_location["lat"], "longitude": session_location["lon"]}).execute()
+                            # 1. IMMEDIATE ECHO
+                            await websocket.send_json({"transcript": text, "is_final": True})
                             
-                            if len(message_buffer) >= BATCH_SIZE:
-                                combined_text = "\n".join(message_buffer)
-                                loc = {"lat": session_location["lat"], "lon": session_location["lon"]} if (session_location["lat"] is not None and session_location["lon"] is not None) else None
-                                result = await assess_danger(combined_text, location=loc)
-                                risk_score = int(result["score"])
-                                action_text = result["reason"] or "Analyzed."
-                                if is_connected:
-                                    # Send ONLY the current message text to UI, but with the risk result
-                                    await websocket.send_json({"transcript": text, "is_final": True, "risk": risk_score, "action": action_text})
-                                message_buffer = []
-                            else:
-                                if is_connected:
-                                    await websocket.send_json({"transcript": text, "is_final": True, "risk": 0})
+                            # 2. Database Logging (Background)
+                            if supabase:
+                                def log_chat():
+                                    supabase.table("logs").insert({"thread_id": thread_id, "content": text, "latitude": session_location["lat"], "longitude": session_location["lon"]}).execute()
+                                threading.Thread(target=log_chat, daemon=True).start()
+                            
+                            session_history.append(text)
+                            
+                            # 3. BACKGROUND ASSESSMENT
+                            if len(session_history) >= BATCH_SIZE:
+                                async def run_chat_assessment(history_snapshot):
+                                    if not is_connected: return
+                                    try:
+                                        full_context = f"Initial Context: {initial_context}\n\nTranscript:\n" + "\n".join(history_snapshot)
+                                        loc = {"lat": session_location["lat"], "lon": session_location["lon"]} if (session_location["lat"] is not None and session_location["lon"] is not None) else None
+                                        
+                                        result = await assess_danger(full_context, location=loc)
+                                        risk_score = int(result["score"])
+                                        risk_level = result["level"]
+                                        action_text = result["reason"] or "Analyzed."
+
+                                        # Persist risk score
+                                        if supabase:
+                                            supabase.table("risk_scores").insert({
+                                                "thread_id": thread_id,
+                                                "score": risk_score,
+                                                "level": risk_level,
+                                                "reason": action_text
+                                            }).execute()
+
+                                        # Trigger Alerts
+                                        if risk_score >= 75:
+                                            await trigger_alerts(risk_score, action_text)
+
+                                        if is_connected:
+                                            await websocket.send_json({
+                                                "risk": risk_score, 
+                                                "action": action_text
+                                            })
+                                    except Exception as chat_bg_err:
+                                        print(f"Chat background assessment error: {chat_bg_err}")
+
+                                asyncio.create_task(run_chat_assessment(list(session_history)))
                         except Exception as e:
                             if is_connected:
-                                print(f"Chat assess error: {e}")
-                                await websocket.send_json({"transcript": text, "is_final": True, "risk": 0, "action": f"Assessment failed: {e}"})
+                                print(f"Chat processing error: {e}")
     except WebSocketDisconnect:
         print(f"Disconnected: {thread_id}")
     finally:
@@ -330,7 +418,11 @@ async def get_thread_details(thread_id: str, user=Depends(get_current_user)):
         
         # Fetch logs
         logs_res = supabase.table("logs").select("*").eq("thread_id", thread_id).order("created_at", desc=False).execute()
+        # Fetch risk scores
+        risk_res = supabase.table("risk_scores").select("*").eq("thread_id", thread_id).order("created_at", desc=False).execute()
+        
         thread["logs"] = logs_res.data
+        thread["risk_scores"] = risk_res.data
         return thread
     except HTTPException:
         raise

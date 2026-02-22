@@ -35,30 +35,32 @@ function LiveStatusContent() {
     const fetchData = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          console.log("No active session found in live-status");
-          return;
-        }
+        if (!session) return;
 
-        console.log(`Fetching thread details for: ${threadId}`);
         const res = await fetch(`http://localhost:8000/api/threads/${threadId}`, {
           headers: { "Authorization": `Bearer ${session?.access_token}` }
         });
 
         if (res.ok) {
           const data = await res.json();
-          setRisk(data.logs?.length > 0 ? 45 : 0);
+          const realRiskScores = data.risk_scores || [];
+
+          if (realRiskScores.length > 0) {
+            const lastScore = realRiskScores[realRiskScores.length - 1].score;
+            setRisk(lastScore);
+
+            const mappedGraphData = realRiskScores.map((s: any) => ({
+              time: new Date(s.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              risk: s.score
+            }));
+            setRiskData(mappedGraphData);
+          } else {
+            setRisk(0);
+            setRiskData([]);
+          }
+
           setLogs(data.logs || []);
           setSessionContext(data.initial_context || "");
-
-          const mappedGraphData = data.logs?.map((l: any, idx: number) => ({
-            time: new Date(l.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            risk: Math.min(100, Math.max(0, 30 + (idx * 5) % 40 + (Math.random() * 10)))
-          })).slice(-15) || [];
-
-          if (mappedGraphData.length > 0) {
-            setRiskData(mappedGraphData);
-          }
         }
       } catch (err) {
         console.error("Failed to fetch thread data:", err);
@@ -68,6 +70,8 @@ function LiveStatusContent() {
     };
 
     fetchData();
+    const interval = setInterval(fetchData, 4000); // Poll every 4 seconds
+    return () => clearInterval(interval);
   }, [threadId, supabase]);
 
   // Scroll to bottom of transcript
@@ -95,8 +99,11 @@ function LiveStatusContent() {
 
       <nav className="fixed top-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 bg-surface/80 backdrop-blur-xl border border-border rounded-full shadow-lg flex items-center gap-8">
         <div className="flex items-center gap-3">
-          <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Live Status Content</span>
+          <div className="relative flex items-center justify-center">
+            <div className="absolute w-4 h-4 rounded-full bg-primary/40 animate-ping" />
+            <div className="w-2 h-2 rounded-full bg-primary relative z-10" />
+          </div>
+          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">AI Active Monitoring</span>
         </div>
         <div className="h-4 w-[1px] bg-border" />
         <button onClick={() => router.push('/')} className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-primary transition-colors">Back to Vault</button>
@@ -105,37 +112,47 @@ function LiveStatusContent() {
       <main className="flex-1 flex flex-col pt-32 pb-12 px-6 max-w-6xl mx-auto w-full relative z-10">
         {sessionContext && (
           <div className="mb-8 p-6 bg-surface border border-border rounded-3xl shadow-sm">
-            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 block mb-2 font-mono">Situation Context</span>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 font-mono">Situation Context</span>
+              <div className="h-[1px] flex-1 bg-border" />
+            </div>
             <p className="text-sm text-slate-700 italic">&quot;{sessionContext}&quot;</p>
           </div>
         )}
-
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-          <div className="lg:col-span-1 bg-surface border border-border rounded-[32px] p-8 shadow-sm">
+          <div className="lg:col-span-1 bg-surface border border-border rounded-[32px] p-8 shadow-sm relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+              <div className="w-16 h-16 border-2 border-primary rounded-full animate-[spin_12s_linear_infinite]" />
+            </div>
+
             <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-6 font-mono">Evaluation</label>
             <div className="space-y-8">
               <div>
                 <h1 className="text-4xl font-black mb-2 flex items-baseline gap-2 text-slate-900">
-                  {Number(risk).toFixed(2)}%
-                  <span className="text-xs text-slate-400 font-normal uppercase tracking-widest">Risk Level</span>
+                  {Number(risk).toFixed(0)}%
+                  <span className="text-xs text-slate-400 font-normal uppercase tracking-widest">Risk Factor</span>
                 </h1>
                 <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-primary transition-all duration-1000 shadow-[0_0_12px_rgba(13,148,136,0.3)]"
+                    className={`h-full transition-all duration-1000 shadow-[0_0_12px_rgba(13,148,136,0.3)] ${risk > 70 ? 'bg-red-500' : 'bg-primary'}`}
                     style={{ width: `${risk}%` }}
                   />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 bg-slate-50 border border-border rounded-2xl">
-                  <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Status</p>
-                  <p className={`text-sm font-bold uppercase tracking-widest ${risk > 70 ? 'text-red-600' : 'text-primary'}`}>
-                    {risk > 70 ? 'CRITICAL' : 'SECURE'}
+                <div className="p-4 bg-slate-50 border border-border rounded-2xl relative overflow-hidden">
+                  <div className="absolute top-0 left-0 w-full h-[2px] bg-primary/20 animate-pulse" />
+                  <p className="text-[10px] font-black text-slate-400 uppercase mb-1">AI Insight</p>
+                  <p className={`text-[10px] font-black uppercase tracking-widest ${risk > 70 ? 'text-red-600' : 'text-primary'}`}>
+                    {risk > 70 ? 'CRITICAL ALERT' : 'SECURE PATH'}
                   </p>
                 </div>
                 <div className="p-4 bg-slate-50 border border-border rounded-2xl">
-                  <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Signal</p>
-                  <p className="text-sm font-bold text-slate-900">ENCRYPTED</p>
+                  <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Status</p>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                    <p className="text-[10px] font-black text-slate-900 uppercase tracking-widest">ANALYZING</p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -197,12 +214,12 @@ function LiveStatusContent() {
             <div ref={transcriptEndRef} />
           </div>
         </div>
-      </main>
+      </main >
 
       <footer className="py-8 text-center text-[8px] font-black uppercase tracking-[0.4em] text-slate-400 opacity-60">
         Secure Transmission Mode // Vault Analysis Protocol
       </footer>
-    </div>
+    </div >
   );
 }
 
