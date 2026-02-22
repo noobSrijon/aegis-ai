@@ -19,17 +19,6 @@ Scoring guide:
 Be conservative: if unsure, choose the LOWER score.
 """
 
-def _keyword_fallback(transcript: str) -> Dict[str, Any]:
-    t = transcript.lower()
-    critical_terms = ["kill myself", "suicide", "shoot", "stab", "i'm going to kill", "i will kill"]
-    high_terms = ["hurt you", "hurt myself", "attack", "beat you", "die", "weapon"]
-
-    if any(x in t for x in critical_terms):
-        return {"level": "critical", "score": 90.0, "reason": "Keyword match indicates critical danger."}
-    if any(x in t for x in high_terms):
-        return {"level": "high", "score": 75.0, "reason": "Keyword match indicates high danger."}
-    return {"level": "low", "score": 10.0, "reason": "No high-risk indicators found (fallback)."}
-
 def _sanitize_result(obj: dict) -> dict:
     level = obj.get("level", "low")
     score = float(obj.get("score", 0.0))
@@ -76,6 +65,8 @@ async def assess_danger(transcript: str, location: Optional[dict] = None) -> dic
         return _sanitize_result(result)
 
     except Exception as e:
-        fb = _keyword_fallback(transcript)
-        fb["reason"] = f'{fb["reason"]} (Groq error: {type(e).__name__})'
-        return fb
+        return {
+            "level": "low",
+            "score": 0.0,
+            "reason": f"Assessment unavailable (Groq error: {type(e).__name__}).",
+        }
