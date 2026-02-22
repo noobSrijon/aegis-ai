@@ -485,7 +485,7 @@ export default function Home() {
       )}
 
       {!isLoading && activeTab === "black-box" && (
-        <main className={`flex-1 flex flex-col mx-auto w-full relative z-10 ${isMonitoring ? 'max-w-7xl h-screen overflow-hidden' : 'max-w-4xl pt-24 pb-12'}`}>
+        <main className={`flex-1 flex flex-col mx-auto w-full relative z-10 ${isMonitoring ? 'max-w-7xl lg:h-screen lg:max-h-screen lg:overflow-hidden' : 'max-w-4xl pt-24 pb-12'}`}>
           {isMonitoring && <div className="h-24 flex-shrink-0" />} {/* Spacer for fixed nav */}
           {!isMonitoring ? (
             <div className="flex-1 flex flex-col items-center justify-center text-center">
@@ -529,10 +529,10 @@ export default function Home() {
               </div>
 
               {/* Two-Panel Layout */}
-              <div className="flex-1 flex flex-col lg:flex-row gap-4 min-h-0 overflow-hidden">
+              <div className="flex-1 flex flex-col lg:flex-row gap-4 min-h-0 lg:overflow-hidden">
 
                 {/* LEFT PANEL — Chat Window */}
-                <div className="w-full lg:w-96 flex flex-col min-h-0 min-w-0">
+                <div className="flex-none h-[450px] lg:h-auto lg:flex-1 lg:max-w-sm flex flex-col min-h-0 min-w-0">
                   {/* Transcript Feed */}
                   <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-1 mb-3">
                     {transcripts.length === 0 && !currentTranscript && (
@@ -572,7 +572,7 @@ export default function Home() {
                 </div>
 
                 {/* RIGHT PANEL — AI Notifications & Suggestions */}
-                <div className="flex-1 flex flex-col min-h-0 bg-[#0A1628]/60 border border-[#0F766E]/25 rounded-2xl overflow-hidden min-w-0">
+                <div className="flex-none h-[450px] lg:h-auto lg:flex-1 flex flex-col min-h-0 bg-[#0A1628]/60 border border-[#0F766E]/25 rounded-2xl overflow-hidden min-w-0">
                   <div className="flex items-center gap-2 px-4 py-3 border-b border-[#0F766E]/20 bg-[#0F172A]/60 flex-shrink-0">
                     <span className="relative flex h-2 w-2">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#14B8A6] opacity-75" />
