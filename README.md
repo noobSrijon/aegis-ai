@@ -75,8 +75,8 @@ Aegis AI provides a safety net through continuous monitoring and proactive alert
 ## Contact
 For questions, demos, or collaboration, reach out to the project team:
 
-*   **[Adil Sabir Azeez]** - [adilsabirazeez@gmail.com]
-*   **[Srijon Kumar]** - [srijonkumar18@gmail.com]
-*   **[Caleb Walters]** - [cwalterssoccer2004@gmail.com]
-*   **[Sri Ram Swaminathan]** - [srirams1627@gmail.com]
+*   **Adil Sabir Azeez** - adilsabirazeez@gmail.com
+*   **Srijon Kumar** - srijonkumar18@gmail.com
+*   **Caleb Walters** - cwalterssoccer2004@gmail.com
+*   **Sri Ram Swaminathan** - srirams1627@gmail.com
 
