@@ -33,6 +33,7 @@ export default function Home() {
   const [myGuardians, setMyGuardians] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [isRecording, setIsRecording] = useState(false);
+  const [isAddingGuardian, setIsAddingGuardian] = useState(false);
   const [guardianEmail, setGuardianEmail] = useState("");
   const [guardianPhone, setGuardianPhone] = useState("");
 
@@ -116,6 +117,24 @@ export default function Home() {
       headers: { "Authorization": `Bearer ${session?.access_token}` }
     });
     await fetchBaseData();
+  };
+
+  const handleRemoveGuardian = async (id: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const res = await fetch(`http://localhost:8000/api/guardians/${id}`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${session?.access_token}` }
+      });
+
+      if (res.ok) {
+        await fetchBaseData();
+      }
+    } catch (err) {
+      console.error("Failed to remove guardian:", err);
+    }
   };
 
   const handleUpdateRole = async (isGuardian: boolean) => {
@@ -332,6 +351,8 @@ export default function Home() {
 
   const handleAddGuardian = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isAddingGuardian) return;
+    setIsAddingGuardian(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
@@ -361,35 +382,67 @@ export default function Home() {
       }
     } catch (err) {
       console.error("Add guardian failed:", err);
+    } finally {
+      setIsAddingGuardian(false);
     }
   };
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
   return (
-    <div className="flex min-h-screen flex-col bg-black text-zinc-100 font-sans selection:bg-zinc-800">
-      <nav className="fixed top-6 left-1/2 -translate-x-1/2 z-50 px-2 py-2 bg-zinc-900/80 backdrop-blur-xl border border-zinc-800 rounded-full shadow-2xl flex items-center gap-1">
+    <div className="flex min-h-screen flex-col bg-[#070F1A] text-[#E5E7EB] font-sans selection:bg-[#14B8A6]/30 overflow-x-hidden relative">
+      {/* Background Halo */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1000px] h-[1000px] bg-[#14B8A6]/5 rounded-full blur-[120px]" />
+        <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-[#14B8A6]/3 rounded-full blur-[80px]" />
+        <div className="absolute -bottom-[10%] -right-[10%] w-[40%] h-[40%] bg-[#14B8A6]/3 rounded-full blur-[80px]" />
+      </div>
+
+      <nav className="fixed top-6 left-1/2 -translate-x-1/2 z-50 px-2 py-2 bg-[#0F172A]/80 backdrop-blur-xl border border-[#0F766E]/30 rounded-full shadow-[0_24px_60px_rgba(0,0,0,0.5)] flex items-center gap-1">
         {isLoading ? (
           <div className="flex items-center gap-2 px-4 py-2">
-            <div className="w-20 h-6 bg-zinc-800 rounded-full animate-shimmer" />
-            <div className="w-20 h-6 bg-zinc-800 rounded-full animate-shimmer" />
-            <div className="w-20 h-6 bg-zinc-800 rounded-full animate-shimmer" />
-            <div className="w-20 h-6 bg-zinc-800 rounded-full animate-shimmer" />
+            <div className="w-20 h-6 bg-[#111827] rounded-full animate-shimmer" />
+            <div className="w-20 h-6 bg-[#111827] rounded-full animate-shimmer" />
+            <div className="w-20 h-6 bg-[#111827] rounded-full animate-shimmer" />
+            <div className="w-20 h-6 bg-[#111827] rounded-full animate-shimmer" />
           </div>
         ) : (
           <>
             {profile?.account_role !== "guardian" && (
               <>
-                <button onClick={() => setActiveTab("black-box")} className={`px-6 py-2 rounded-full text-sm font-semibold transition-all ${activeTab === "black-box" ? "bg-white text-black shadow-lg" : "text-zinc-400 hover:text-white"}`}>black-box</button>
-                <button onClick={() => setActiveTab("history")} className={`px-6 py-2 rounded-full text-sm font-semibold transition-all ${activeTab === "history" ? "bg-white text-black shadow-lg" : "text-zinc-400 hover:text-white"}`}>history</button>
+                <button
+                  onClick={() => setActiveTab("black-box")}
+                  className={`px-6 py-2 rounded-full text-sm font-semibold transition-all border ${activeTab === "black-box" ? "bg-[#14B8A6] text-[#0B1120] border-[#14B8A6] shadow-[0_0_20px_rgba(20,184,166,0.3)]" : "text-[#9CA3AF] border-[#0F766E]/50 hover:text-[#E5E7EB] hover:border-[#14B8A6]/50"}`}
+                >
+                  black-box
+                </button>
+                <button
+                  onClick={() => setActiveTab("history")}
+                  className={`px-6 py-2 rounded-full text-sm font-semibold transition-all border ${activeTab === "history" ? "bg-[#14B8A6] text-[#0B1120] border-[#14B8A6] shadow-[0_0_20px_rgba(20,184,166,0.3)]" : "text-[#9CA3AF] border-[#0F766E]/50 hover:text-[#E5E7EB] hover:border-[#14B8A6]/50"}`}
+                >
+                  history
+                </button>
               </>
             )}
-            <button onClick={() => setActiveTab("guardians")} className={`px-6 py-2 rounded-full text-sm font-semibold transition-all ${activeTab === "guardians" ? "bg-white text-black shadow-lg" : "text-zinc-400 hover:text-white"}`}>guardians</button>
-            <button onClick={() => setActiveTab("notifications")} className={`px-6 py-2 rounded-full text-sm font-semibold transition-all relative ${activeTab === "notifications" ? "bg-white text-black shadow-lg" : "text-zinc-400 hover:text-white"}`}>
-              notifications
-              {unreadCount > 0 && <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[8px] font-bold text-white">{unreadCount}</span>}
+            <button
+              onClick={() => setActiveTab("guardians")}
+              className={`px-6 py-2 rounded-full text-sm font-semibold transition-all border ${activeTab === "guardians" ? "bg-[#14B8A6] text-[#0B1120] border-[#14B8A6] shadow-[0_0_20px_rgba(20,184,166,0.3)]" : "text-[#9CA3AF] border-[#0F766E]/50 hover:text-[#E5E7EB] hover:border-[#14B8A6]/50"}`}
+            >
+              guardians
             </button>
-            <button onClick={() => setActiveTab("profile")} className={`px-6 py-2 rounded-full text-sm font-semibold transition-all ${activeTab === "profile" ? "bg-white text-black shadow-lg" : "text-zinc-400 hover:text-white"}`}>profile</button>
+            <button
+              onClick={() => setActiveTab("notifications")}
+              className={`px-6 py-2 rounded-full text-sm font-semibold transition-all relative border ${activeTab === "notifications" ? "bg-[#14B8A6] text-[#0B1120] border-[#14B8A6] shadow-[0_0_20px_rgba(20,184,166,0.3)]" : "text-[#9CA3AF] border-[#0F766E]/50 hover:text-[#E5E7EB] hover:border-[#14B8A6]/50"}`}
+            >
+              notifications
+              {unreadCount > 0 && <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#FF8559] text-[8px] font-bold text-white shadow-lg">{unreadCount}</span>}
+            </button>
+            <button
+              onClick={() => setActiveTab("profile")}
+              className={`px-6 py-2 rounded-full text-sm font-semibold transition-all border ${activeTab === "profile" ? "bg-[#14B8A6] text-[#0B1120] border-[#14B8A6] shadow-[0_0_20px_rgba(20,184,166,0.3)]" : "text-[#9CA3AF] border-[#0F766E]/50 hover:text-[#E5E7EB] hover:border-[#14B8A6]/50"}`}
+            >
+              profile
+            </button>
           </>
         )}
       </nav>
@@ -406,20 +459,30 @@ export default function Home() {
       )}
 
       {!isLoading && activeTab === "black-box" && (
-        <main className="flex-1 flex flex-col pt-24 pb-12 px-4 max-w-4xl mx-auto w-full">
+        <main className="flex-1 flex flex-col pt-24 pb-12 px-4 max-w-4xl mx-auto w-full relative z-10">
           {!isMonitoring ? (
             <div className="flex-1 flex flex-col items-center justify-center text-center">
-              <div className="mb-8 p-4 rounded-2xl bg-zinc-900/50 border border-zinc-800 max-w-lg">
-                <h2 className="text-xl font-bold mb-4 bg-gradient-to-r from-white to-zinc-500 bg-clip-text text-transparent">The Safety Shadow</h2>
-                <p className="text-zinc-400 text-sm">Conversational guardian for high-stakes events. Real-time risk evaluation as you speak.</p>
+              <div className="mb-8 p-4 rounded-2xl bg-[#0F172A]/50 border border-[#0F766E]/30 max-w-lg shadow-[0_24px_60px_rgba(0,0,0,0.5)]">
+                <h2 className="text-xl font-bold mb-4 flex items-center justify-center gap-3">
+                  <span className="w-1.5 h-6 bg-[#14B8A6] rounded-full" />
+                  The Safety Shadow
+                </h2>
+                <p className="text-[#9CA3AF] text-sm leading-relaxed max-w-[520px]">Conversational guardian for high-stakes events. Real-time risk evaluation as you speak.</p>
               </div>
-              <button onClick={() => {
-                setSessionContext("");
-                setMonitoringMode("both");
-                setShowInitiationModal(true);
-              }} disabled={status === 'connecting'} className="px-10 py-5 bg-white text-black font-black rounded-full hover:scale-105 active:scale-95 transition-all">INITIATE BLACK-BOX</button>
+              <button
+                onClick={() => {
+                  setSessionContext("");
+                  setMonitoringMode("both");
+                  setShowInitiationModal(true);
+                }}
+                disabled={status === 'connecting'}
+                className="group px-10 py-5 bg-[#14B8A6] text-[#0B1120] font-black rounded-full hover:bg-[#22C9B7] hover:scale-105 hover:shadow-[0_0_24px_rgba(20,184,166,0.5)] active:scale-95 active:bg-[#0F766E] transition-all flex items-center gap-3 uppercase tracking-widest"
+              >
+                INITIATE BLACK-BOX
+                <svg className="w-4 h-4 text-[#0B1120] group-hover:translate-x-1 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+              </button>
               {status === "error" && (
-                <p className="mt-4 text-red-500 text-xs font-bold uppercase tracking-widest animate-pulse">Connection Failed. Please check console for details.</p>
+                <p className="mt-4 text-[#FF8559] text-xs font-bold uppercase tracking-widest animate-pulse">Connection Failed. Please check console for details.</p>
               )}
             </div>
           ) : (
@@ -457,60 +520,66 @@ export default function Home() {
         </main>
       )}
 
-      {/* Onboarding Overlay */}
       {showOnboarding && (
-        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="max-w-md w-full bg-zinc-900 border border-zinc-800 rounded-3xl p-8 shadow-2xl animate-in zoom-in-95 duration-300">
-            {onboardingStep === 1 ? (
-              <div className="text-center">
-                <h2 className="text-2xl font-black mb-2">Voice Enrollment</h2>
-                <div className="bg-black/50 p-6 rounded-2xl border border-zinc-800 italic text-lg mb-8 text-zinc-300">&quot;The quick brown fox jumps over the lazy dog. My shadow is my guardian, keeping me safe in the dark.&quot;</div>
-                <button onClick={handleEnrollVoice} disabled={isRecording} className={`w-full py-4 rounded-full font-bold transition-all ${isRecording ? 'bg-red-500 animate-pulse text-white' : 'bg-white text-black hover:scale-105'}`}>{isRecording ? "RECORDING..." : "START RECORDING"}</button>
-              </div>
-            ) : (
-              <div>
-                <h2 className="text-2xl font-black mb-2 text-center">Guardian Setup</h2>
-                <form onSubmit={handleAddGuardian} className="space-y-4">
-                  <input type="email" required placeholder="Guardian Email" value={guardianEmail} onChange={(e) => setGuardianEmail(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:border-white/20 outline-none" />
-                  <input type="tel" placeholder="Guardian Phone" value={guardianPhone} onChange={(e) => setGuardianPhone(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:border-white/20 outline-none" />
-                  <button className="w-full py-4 bg-white text-black rounded-full font-bold hover:scale-105 transition-all">COMPLETE SETUP</button>
-                </form>
-              </div>
-            )}
+        <div className="fixed inset-0 z-[100] bg-[#070F1A]/95 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="max-w-md w-full bg-[#0F172A] border border-[#0F766E]/30 rounded-[32px] p-8 shadow-[0_32px_80px_rgba(0,0,0,0.6)] animate-in fade-in zoom-in duration-300">
+            <div className="w-16 h-16 bg-[#14B8A6]/10 rounded-3xl flex items-center justify-center mb-6 mx-auto">
+              <svg className="w-8 h-8 text-[#14B8A6]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
+            </div>
+            <h2 className="text-2xl font-black text-center mb-2">Welcome to Black-Box</h2>
+            <p className="text-[#9CA3AF] text-center text-sm mb-8 leading-relaxed">Add a trusted guardian to monitor your safety during high-stakes situations.</p>
+
+            <div className="space-y-6">
+              <form onSubmit={handleAddGuardian} className="space-y-4">
+                <input type="email" required placeholder="Guardian Email" value={guardianEmail} onChange={(e) => setGuardianEmail(e.target.value)} className="w-full bg-[#070F1A] border border-[#0F766E]/20 rounded-2xl px-4 py-4 text-sm focus:border-[#14B8A6] outline-none transition-all placeholder:text-zinc-800" />
+                <input type="tel" placeholder="Guardian Phone" value={guardianPhone} onChange={(e) => setGuardianPhone(e.target.value)} className="w-full bg-[#070F1A] border border-[#0F766E]/20 rounded-2xl px-4 py-4 text-sm focus:border-[#14B8A6] outline-none transition-all placeholder:text-zinc-800" />
+                <button
+                  disabled={isAddingGuardian}
+                  className="w-full py-5 bg-[#14B8A6] text-[#0B1120] rounded-full font-black hover:bg-[#22C9B7] hover:scale-105 transition-all disabled:opacity-50 disabled:scale-100 uppercase tracking-widest shadow-lg"
+                >
+                  {isAddingGuardian ? "SUBMITTING..." : "COMPLETE SETUP"}
+                </button>
+              </form>
+            </div>
           </div>
         </div>
       )}
 
       {/* Initiation Modal */}
       {showInitiationModal && (
-        <div className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4">
-          <div className="max-w-md w-full bg-zinc-900 border border-zinc-100/10 rounded-[40px] p-10 shadow-3xl animate-in zoom-in-95 duration-300">
-            <div className="mb-8">
-              <h3 className="text-3xl font-black mb-2 tracking-tight">Initiate Session</h3>
-              <p className="text-zinc-500 text-sm leading-relaxed">Tell us what's happening so your guardians have the full context if things escalate.</p>
+        <div className="fixed inset-0 z-[100] bg-[#070F1A]/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowInitiationModal(false)}>
+          <div className="max-w-lg w-full bg-[#0F172A] border border-[#0F766E]/30 rounded-[32px] p-8 shadow-[0_32px_80px_rgba(0,0,0,0.6)] active:scale-[0.99] transition-all" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-black flex items-center gap-3">
+                <span className="w-1.5 h-6 bg-[#14B8A6] rounded-full" />
+                Session Setup
+              </h2>
+              <button onClick={() => setShowInitiationModal(false)} className="w-10 h-10 rounded-full bg-[#070F1A] flex items-center justify-center text-[#9CA3AF] hover:text-[#E5E7EB] transition-colors border border-[#0F766E]/20">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              </button>
             </div>
 
-            <div className="space-y-8">
+            <div className="space-y-6">
               <div>
-                <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-600 mb-4">SITUATION CONTEXT</label>
+                <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-[#0F766E] mb-3">SITUATION CONTEXT</label>
                 <textarea
+                  placeholder="e.g. Walking home late at night..."
                   value={sessionContext}
                   onChange={(e) => setSessionContext(e.target.value)}
-                  placeholder="e.g. Walking to my car in a dark parking lot..."
-                  className="w-full bg-black border border-zinc-800 rounded-3xl p-5 text-sm text-zinc-100 placeholder:text-zinc-700 focus:outline-none focus:border-zinc-500 transition-all min-h-[120px] resize-none"
+                  className="w-full bg-[#070F1A] border border-[#0F766E]/20 rounded-2xl p-5 text-sm focus:border-[#14B8A6] outline-none h-32 resize-none leading-relaxed transition-all placeholder:text-zinc-800"
                 />
               </div>
 
               <div>
-                <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-600 mb-4">MONITORING MODE</label>
+                <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-[#0F766E] mb-3">MONITORING MODE</label>
                 <div className="grid grid-cols-3 gap-3">
                   {(['audio', 'text', 'both'] as const).map((mode) => (
                     <button
                       key={mode}
                       onClick={() => setMonitoringMode(mode)}
                       className={`py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border ${monitoringMode === mode
-                        ? 'bg-white text-black border-white shadow-[0_0_20px_rgba(255,255,255,0.1)]'
-                        : 'bg-black text-zinc-500 border-zinc-800 hover:border-zinc-700'
+                        ? 'bg-[#14B8A6] text-[#0B1120] border-[#14B8A6]'
+                        : 'bg-[#070F1A] text-[#9CA3AF] border-[#0F766E]/20 hover:border-[#0F766E]/50'
                         }`}
                     >
                       {mode}
@@ -519,18 +588,19 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="pt-6 flex flex-col gap-4">
+              <div className="pt-4 space-y-3">
                 <button
                   onClick={startMonitoring}
-                  className="w-full py-5 bg-white text-black font-black rounded-full hover:scale-[1.02] active:scale-[0.98] transition-all uppercase tracking-[0.15em] shadow-xl"
+                  disabled={status === 'connecting'}
+                  className="w-full py-5 bg-[#14B8A6] text-[#0B1120] font-black rounded-full hover:bg-[#22C9B7] hover:scale-[1.02] active:scale-[0.98] transition-all uppercase tracking-[0.15em] shadow-lg shadow-[#14B8A6]/20"
                 >
-                  START BLACK-BOX
+                  {status === 'connecting' ? 'CONNECTING...' : 'START BLACK-BOX'}
                 </button>
                 <button
                   onClick={() => setShowInitiationModal(false)}
-                  className="w-full py-3 text-zinc-600 font-bold hover:text-zinc-400 transition-all uppercase text-[10px] tracking-widest"
+                  className="w-full py-3 text-[#9CA3AF] font-bold hover:text-[#E5E7EB] transition-all uppercase text-[10px] tracking-widest"
                 >
-                  GO BACK
+                  CANCEL
                 </button>
               </div>
             </div>
@@ -540,94 +610,61 @@ export default function Home() {
 
       {/* Manual Add Guardian Modal */}
       {showAddGuardianModal && (
-        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowAddGuardianModal(false)}>
-          <div className="max-w-md w-full bg-zinc-900 border border-zinc-800 rounded-3xl p-8 shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[100] bg-[#070F1A]/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowAddGuardianModal(false)}>
+          <div className="max-w-md w-full bg-[#0F172A] border border-[#0F766E]/30 rounded-[32px] p-8 shadow-[0_32px_80px_rgba(0,0,0,0.6)] animate-in fade-in zoom-in duration-300" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-black">Add Guardian</h2>
-              <button onClick={() => setShowAddGuardianModal(false)} className="text-zinc-500 hover:text-white">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              <h2 className="text-2xl font-black flex items-center gap-3">
+                <span className="w-1.5 h-6 bg-[#14B8A6] rounded-full" />
+                Add Guardian
+              </h2>
+              <button onClick={() => setShowAddGuardianModal(false)} className="w-10 h-10 rounded-full bg-[#070F1A] flex items-center justify-center text-[#9CA3AF] hover:text-[#E5E7EB] transition-colors border border-[#0F766E]/20">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
               </button>
             </div>
-            <p className="text-zinc-400 text-sm mb-6">They will receive an alert if your risk levels spike during a session.</p>
+            <p className="text-[#9CA3AF] text-sm mb-8 leading-relaxed">They will receive an alert if your risk levels spike during a session.</p>
             <form onSubmit={handleAddGuardian} className="space-y-4">
-              <input type="email" required placeholder="Guardian Email" value={guardianEmail} onChange={(e) => setGuardianEmail(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:border-white/20 outline-none" />
-              <input type="tel" placeholder="Guardian Phone" value={guardianPhone} onChange={(e) => setGuardianPhone(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:border-white/20 outline-none" />
-              <button className="w-full py-4 bg-white text-black rounded-full font-bold hover:scale-105 transition-all">ADD GUARDIAN</button>
+              <input type="email" required placeholder="Guardian Email" value={guardianEmail} onChange={(e) => setGuardianEmail(e.target.value)} className="w-full bg-[#070F1A] border border-[#0F766E]/20 rounded-2xl px-4 py-4 text-sm focus:border-[#14B8A6] outline-none transition-all placeholder:text-zinc-800" />
+              <input type="tel" placeholder="Guardian Phone" value={guardianPhone} onChange={(e) => setGuardianPhone(e.target.value)} className="w-full bg-[#070F1A] border border-[#0F766E]/20 rounded-2xl px-4 py-4 text-sm focus:border-[#14B8A6] outline-none transition-all placeholder:text-zinc-800" />
+              <button
+                disabled={isAddingGuardian}
+                className="w-full py-5 bg-[#14B8A6] text-[#0B1120] rounded-full font-black hover:bg-[#22C9B7] hover:scale-105 transition-all disabled:opacity-50 disabled:scale-100 uppercase tracking-widest shadow-lg shadow-[#14B8A6]/20"
+              >
+                {isAddingGuardian ? "ADDING..." : "ADD GUARDIAN"}
+              </button>
             </form>
           </div>
         </div>
       )}
 
-      {/* Session Initiation Modal */}
-      {showInitiationModal && (
-        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowInitiationModal(false)}>
-          <div className="max-w-lg w-full bg-zinc-900 border border-zinc-800 rounded-3xl p-8 shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-black">Session Setup</h2>
-              <button onClick={() => setShowInitiationModal(false)} className="text-zinc-500 hover:text-white">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-              </button>
-            </div>
-            <div className="space-y-6">
-              <div>
-                <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3">Situation Context</label>
-                <textarea
-                  placeholder="e.g. Walking home late at night, Meeting someone from the internet, Heading into a tense meeting..."
-                  value={sessionContext}
-                  onChange={(e) => setSessionContext(e.target.value)}
-                  className="w-full bg-black border border-zinc-800 rounded-2xl p-4 text-sm focus:border-white/20 outline-none h-32 resize-none leading-relaxed"
-                />
-                <p className="text-[10px] text-zinc-600 mt-2 italic">This helps your shadow better evaluate incoming risks.</p>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3">Monitoring Mode</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(['audio', 'text', 'both'] as const).map((m) => (
-                    <button
-                      key={m}
-                      onClick={() => setMonitoringMode(m)}
-                      className={`py-3 rounded-xl border text-[10px] font-black uppercase transition-all ${monitoringMode === m ? 'bg-white text-black border-white' : 'bg-black text-zinc-500 border-zinc-800 hover:border-zinc-700'}`}
-                    >
-                      {m}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <button
-                onClick={startMonitoring}
-                disabled={status === 'connecting'}
-                className="w-full py-5 bg-white text-black font-black rounded-full hover:scale-105 active:scale-95 transition-all mt-4"
-              >
-                {status === 'connecting' ? 'CONNECTING...' : 'INITIATE BLACK-BOX'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-
+      {/* History View */}
       {!isLoading && activeTab === "history" && (
-        <main className="flex-1 flex flex-col pt-24 px-4 max-w-4xl mx-auto w-full">
+        <main className="flex-1 flex flex-col pt-24 px-4 max-w-4xl mx-auto w-full relative z-10">
           <div className="flex justify-between items-center mb-8">
-            <h2 className="text-2xl font-black">Session Vault</h2>
+            <h2 className="text-2xl font-black flex items-center gap-3">
+              <span className="w-1.5 h-6 bg-[#14B8A6] rounded-full" />
+              Session Vault
+            </h2>
           </div>
           <div className="space-y-4">
-            {history.length === 0 ? <div className="p-8 border-2 border-dashed border-zinc-900 rounded-3xl text-center text-zinc-600 italic">No historical traces found.</div> :
+            {history.length === 0 ? <div className="p-12 border-2 border-dashed border-[#0F766E]/20 rounded-[32px] text-center text-[#9CA3AF] italic bg-[#0F172A]/30">No historical traces found.</div> :
               history.map((h, i) => (
-                <div key={i} className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6 transition-all hover:bg-zinc-900">
+                <div key={i} className="bg-[#0F172A]/50 border border-[#0F766E]/20 rounded-[24px] p-6 transition-all hover:bg-[#0F172A] hover:border-[#14B8A6]/30 shadow-lg group">
                   <div className="flex justify-between items-start mb-4">
-                    <code className="text-xs text-zinc-300">{h.id}</code>
-                    <span className="text-[10px] font-bold text-zinc-600">{new Date(h.created_at).toLocaleString()}</span>
+                    <code className="text-[10px] text-[#14B8A6] font-mono bg-[#14B8A6]/10 px-2 py-0.5 rounded-md">{h.id}</code>
+                    <span className="text-[10px] font-bold text-[#9CA3AF] uppercase tracking-widest">{new Date(h.created_at).toLocaleString()}</span>
                   </div>
                   {h.initial_context && (
-                    <div className="mb-4 p-3 bg-black/50 border border-zinc-800 rounded-xl text-xs text-zinc-500 italic">
+                    <div className="mb-4 p-4 bg-[#070F1A] border border-[#0F766E]/10 rounded-2xl text-xs text-[#9CA3AF] italic leading-relaxed">
                       &quot;{h.initial_context}&quot;
                     </div>
                   )}
-                  <div className="space-y-2">
-                    {h.logs?.slice(0, 3).map((l: any, i: number) => (<div key={i} className="text-sm text-zinc-400 line-clamp-1 border-l border-zinc-700 pl-3"><span className="text-[10px] font-mono mr-2 text-zinc-600">{l.speaker_label || 'USER'}:</span>{l.content}</div>))}
+                  <div className="space-y-3">
+                    {h.logs?.slice(0, 3).map((l: any, i: number) => (
+                      <div key={i} className="text-sm text-[#E5E7EB] line-clamp-1 border-l-2 border-[#14B8A6]/20 pl-4 py-1">
+                        <span className="text-[10px] font-black mr-3 text-[#14B8A6] uppercase tracking-wider">{l.speaker_label || 'USER'}:</span>
+                        {l.content}
+                      </div>
+                    ))}
                   </div>
                 </div>
               ))}
@@ -635,62 +672,80 @@ export default function Home() {
         </main>
       )}
 
+      {/* Guardians View */}
       {!isLoading && activeTab === "guardians" && (
-        <main className="flex-1 flex flex-col pt-24 px-4 max-w-4xl mx-auto w-full pb-20">
+        <main className="flex-1 flex flex-col pt-24 px-4 max-w-4xl mx-auto w-full pb-20 relative z-10">
           <div className={`grid grid-cols-1 ${profile?.account_role !== "guardian" ? 'lg:grid-cols-2' : ''} gap-12`}>
-            {/* Left Column: My Protectors */}
+            {/* My Protectors */}
             {profile?.account_role !== "guardian" && (
               <div>
                 <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-black">My Protectors</h2>
-                  <button onClick={() => setShowAddGuardianModal(true)} className="px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-full text-xs font-bold hover:bg-zinc-800 transition-all flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-                    ADD
+                  <h2 className="text-2xl font-black flex items-center gap-3">
+                    <span className="w-1.5 h-6 bg-[#14B8A6] rounded-full" />
+                    My Protectors
+                  </h2>
+                  <button onClick={() => setShowAddGuardianModal(true)} className="w-10 h-10 rounded-full bg-[#14B8A6] text-[#0B1120] flex items-center justify-center hover:bg-[#22C9B7] hover:scale-105 transition-all shadow-lg shadow-[#14B8A6]/20">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
                   </button>
                 </div>
-                <p className="text-zinc-500 text-sm mb-6">These are the people notified during your high-risk sessions.</p>
+                <p className="text-[#9CA3AF] text-sm mb-8 leading-relaxed">These are the people notified during your high-risk sessions.</p>
                 <div className="space-y-3">
-                  {myGuardians.length === 0 ? <div className="p-8 border border-dashed border-zinc-900 rounded-2xl text-center text-zinc-600 text-sm">Nobody is protecting you yet.</div> :
+                  {myGuardians.length === 0 ? <div className="p-12 border border-dashed border-[#0F766E]/20 rounded-3xl text-center text-[#9CA3AF] text-sm bg-[#0F172A]/30">Nobody is protecting you yet.</div> :
                     myGuardians.map((g, i) => (
-                      <div key={i} className="bg-zinc-900/30 border border-zinc-800/50 rounded-2xl p-4 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-full bg-zinc-800 flex items-center justify-center font-bold text-zinc-500 uppercase">{g.guardian_email?.charAt(0)}</div>
+                      <div key={i} className="bg-[#0F172A]/50 border border-[#0F766E]/20 rounded-2xl p-4 flex items-center justify-between group hover:border-[#14B8A6]/30 transition-all shadow-md">
+                        <div className="flex items-center gap-4">
+                          <div className="h-12 w-12 rounded-2xl bg-[#070F1A] border border-[#0F766E]/20 flex items-center justify-center font-black text-[#14B8A6] uppercase">{g.guardian_email?.charAt(0)}</div>
                           <div>
-                            <h4 className="text-sm font-bold text-zinc-200">{g.guardian_email}</h4>
-                            <span className={`text-[10px] font-bold uppercase tracking-wider ${g.status === 'active' ? 'text-green-500' : 'text-zinc-500'}`}>{g.status}</span>
+                            <h4 className="text-sm font-bold text-[#E5E7EB]">{g.guardian_email}</h4>
+                            <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${g.status === 'active' ? 'text-[#14B8A6]' : 'text-[#9CA3AF]'}`}>{g.status}</span>
                           </div>
                         </div>
+                        <button
+                          onClick={() => handleRemoveGuardian(g.id)}
+                          className="p-3 text-[#9CA3AF] hover:text-[#FF8559] hover:bg-[#FF8559]/10 rounded-xl transition-all opacity-0 group-hover:opacity-100"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2m-6 9 2 2 4-4" /></svg>
+                        </button>
                       </div>
                     ))}
                 </div>
               </div>
             )}
 
-            {/* Right Column: People I Guard */}
+            {/* Watching Over */}
             <div>
-              <h2 className="text-2xl font-black mb-6">Watching Over</h2>
-              <p className="text-zinc-500 text-sm mb-6">Users who have added you as their safety contact.</p>
+              <h2 className="text-2xl font-black mb-6 flex items-center gap-3">
+                <span className="w-1.5 h-6 bg-[#FF8559] rounded-full" />
+                Watching Over
+              </h2>
+              <p className="text-[#9CA3AF] text-sm mb-8 leading-relaxed">Users who have added you as their safety contact.</p>
               <div className="grid grid-cols-1 gap-4">
-                {guarding.length === 0 ? <div className="p-12 border-2 border-dashed border-zinc-900 rounded-3xl text-center text-zinc-600 italic">You aren&apos;t guarding anyone yet.</div> :
+                {guarding.length === 0 ? <div className="p-12 border-2 border-dashed border-[#0F766E]/20 rounded-[32px] text-center text-[#9CA3AF] italic bg-[#0F172A]/30">You aren&apos;t guarding anyone yet.</div> :
                   guarding.map((rel, i) => {
                     const p = rel.profiles;
                     if (!p) return null;
                     return (
-                      <div key={rel.id} className="bg-zinc-100/[0.03] border border-zinc-800/50 rounded-3xl p-6 flex items-center justify-between group transition-all hover:bg-zinc-900">
-                        <div className="flex items-center gap-4">
-                          <div className="h-12 w-12 rounded-full bg-zinc-800 flex items-center justify-center font-black text-zinc-500 group-hover:text-white uppercase">{p.full_name?.charAt(0) || p.email.charAt(0)}</div>
+                      <div key={rel.id} className="bg-[#0F172A]/50 border border-[#0F766E]/20 rounded-[24px] p-6 flex items-center justify-between group transition-all hover:border-[#14B8A6]/30 shadow-lg">
+                        <div className="flex items-center gap-5">
+                          <div className="h-14 w-14 rounded-2xl bg-[#070F1A] border border-[#0F766E]/20 flex items-center justify-center font-black text-[#9CA3AF] group-hover:text-[#14B8A6] uppercase transition-colors">{p.full_name?.charAt(0) || p.email.charAt(0)}</div>
                           <div>
-                            <h4 className="font-bold text-zinc-100">{p.full_name || "Anonymous User"}</h4>
-                            <p className="text-xs text-zinc-500 font-mono mb-1">{p.email}</p>
-                            <span className={`text-[10px] font-bold uppercase ${rel.status === 'active' ? 'text-green-500' : 'text-yellow-500'}`}>{rel.status}</span>
+                            <h4 className="font-bold text-[#E5E7EB] text-lg">{p.full_name || "Anonymous User"}</h4>
+                            <p className="text-[10px] text-[#9CA3AF] font-mono tracking-wider opacity-60">{p.email}</p>
+                            <span className={`text-[10px] font-black uppercase tracking-[0.2em] mt-2 block ${rel.status === 'active' ? 'text-[#14B8A6]' : 'text-[#FF8559]'}`}>{rel.status}</span>
                           </div>
                         </div>
-                        <div className="text-right">
+                        <div className="text-right flex items-center gap-4">
                           {rel.status === 'pending' ? (
-                            <button onClick={() => handleAcceptGuardian(rel.id)} className="px-4 py-2 bg-white text-black text-[10px] font-black rounded-full hover:scale-105 transition-all uppercase">Accept Request</button>
+                            <button onClick={() => handleAcceptGuardian(rel.id)} className="px-5 py-2.5 bg-[#14B8A6] text-[#0B1120] text-[10px] font-black rounded-full hover:bg-[#22C9B7] hover:scale-105 transition-all uppercase tracking-widest shadow-lg">Accept Request</button>
                           ) : (
-                            <button className="text-[10px] font-black text-white hover:underline uppercase transition-all">Live Status</button>
+                            <button className="text-[10px] font-black text-[#14B8A6] hover:text-[#22C9B7] uppercase transition-all tracking-widest border border-[#14B8A6]/20 bg-[#14B8A6]/5 px-4 py-2 rounded-full">Live Status</button>
                           )}
+                          <button
+                            onClick={() => handleRemoveGuardian(rel.id)}
+                            className="p-3 text-[#9CA3AF] hover:text-[#FF8559] hover:bg-[#FF8559]/10 rounded-xl transition-all opacity-0 group-hover:opacity-100"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2m-6 9 2 2 4-4" /></svg>
+                          </button>
                         </div>
                       </div>
                     );
@@ -701,75 +756,92 @@ export default function Home() {
         </main>
       )}
 
+      {/* Notifications View */}
       {!isLoading && activeTab === "notifications" && (
-        <main className="flex-1 flex flex-col pt-24 px-4 max-w-2xl mx-auto w-full">
-          <h2 className="text-2xl font-black mb-8">Alerts & Notifications</h2>
+        <main className="flex-1 flex flex-col pt-24 px-4 max-w-2xl mx-auto w-full relative z-10">
+          <div className="flex justify-between items-center mb-8">
+            <h2 className="text-2xl font-black flex items-center gap-3">
+              <span className="w-1.5 h-6 bg-[#FF8559] rounded-full" />
+              Alerts & Notifications
+            </h2>
+          </div>
           <div className="space-y-4">
-            {notifications.length === 0 ? <div className="p-12 border-2 border-dashed border-zinc-900 rounded-3xl text-center text-zinc-600 italic">No notifications yet.</div> :
+            {notifications.length === 0 ? (
+              <div className="p-12 border-2 border-dashed border-[#0F766E]/20 rounded-[32px] text-center text-[#9CA3AF] italic bg-[#0F172A]/30">
+                No active signals found.
+              </div>
+            ) : (
               notifications.map((n, i) => (
-                <div key={i} onClick={() => !n.is_read && markNotificationRead(n.id)} className={`bg-zinc-900/50 border ${n.is_read ? 'border-zinc-800' : 'border-zinc-100/20'} rounded-2xl p-6 transition-all hover:bg-zinc-900 cursor-pointer relative`}>
-                  {!n.is_read && <div className="absolute top-6 right-6 h-2 w-2 rounded-full bg-blue-500" />}
-                  <div className="mb-2 flex items-center gap-2">
-                    <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${n.type === 'risk_alert' ? 'bg-red-500/10 text-red-500' : 'bg-zinc-800 text-zinc-400'}`}>{n.type.replace('_', ' ')}</span>
-                    <span className="text-[10px] text-zinc-600 font-mono">{new Date(n.created_at).toLocaleString()}</span>
+                <div key={i} onClick={() => !n.is_read && markNotificationRead(n.id)} className={`bg-[#0F172A]/50 border ${n.is_read ? 'border-[#0F766E]/20' : 'border-[#14B8A6]/40'} rounded-2xl p-6 transition-all hover:bg-[#0F172A] cursor-pointer relative shadow-lg group`}>
+                  {!n.is_read && <div className="absolute top-6 right-6 h-2 w-2 rounded-full bg-[#14B8A6] shadow-[0_0_8px_rgba(20,184,166,0.5)]" />}
+                  <div className="mb-3 flex items-center gap-3">
+                    <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded ${n.type === 'risk_alert' ? 'bg-[#FF8559]/20 text-[#FF8559]' : 'bg-[#14B8A6]/20 text-[#14B8A6]'}`}>{n.type.replace('_', ' ')}</span>
+                    <span className="text-[10px] text-[#9CA3AF] font-mono opacity-60">{new Date(n.created_at).toLocaleString()}</span>
                   </div>
-                  <h4 className={`font-bold ${n.is_read ? 'text-zinc-400' : 'text-zinc-100'}`}>{n.title}</h4>
-                  <p className="text-sm text-zinc-500 mt-2 leading-relaxed">{n.message}</p>
+                  <h4 className={`font-bold text-lg ${n.is_read ? 'text-[#9CA3AF]' : 'text-[#E5E7EB]'}`}>{n.title}</h4>
+                  <p className="text-sm text-[#9CA3AF] mt-2 leading-relaxed">{n.message}</p>
                 </div>
-              ))}
+              ))
+            )}
           </div>
         </main>
       )}
 
+      {/* Profile View */}
       {!isLoading && activeTab === "profile" && (
-        <main className="flex-1 flex flex-col pt-24 px-4 max-w-2xl mx-auto w-full">
-          <h2 className="text-2xl font-black mb-8">Profile & Settings</h2>
-          <div className="space-y-6">
-            <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6">
-              <h3 className="text-sm font-bold text-zinc-500 uppercase tracking-widest mb-4">Account Information</h3>
-              <div className="space-y-4">
+        <main className="flex-1 flex flex-col pt-24 px-4 max-w-4xl mx-auto w-full relative z-10">
+          <h2 className="text-2xl font-black mb-8 flex items-center gap-3">
+            <span className="w-1.5 h-6 bg-[#14B8A6] rounded-full" />
+            Account Command
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="bg-[#0F172A]/50 border border-[#0F766E]/20 rounded-[32px] p-8 shadow-xl">
+              <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-[#0F766E] mb-6">PROFILE INFORMATION</label>
+              <div className="space-y-6">
                 <div>
-                  <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-600 mb-1">Email Address</label>
-                  <p className="text-zinc-100 font-medium">{profile?.email || user?.email}</p>
+                  <p className="text-[10px] text-[#9CA3AF] uppercase font-black mb-1">Full Name</p>
+                  <p className="text-[#E5E7EB] font-bold text-lg">{profile?.full_name || "Tracer User"}</p>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-600 mb-1">Full Name</label>
-                  <p className="text-zinc-100 font-medium">{profile?.full_name || "Not provided"}</p>
+                  <p className="text-[10px] text-[#9CA3AF] uppercase font-black mb-1">Identity</p>
+                  <p className="text-[#E5E7EB] font-bold text-lg">{profile?.email || user?.email}</p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6">
-              <h3 className="text-sm font-bold text-zinc-500 uppercase tracking-widest mb-4">Preferences</h3>
-              <div className="flex items-center justify-between p-4 bg-black/30 border border-zinc-800 rounded-xl">
-                <div>
-                  <h4 className="font-bold text-zinc-100">Guardian Mode</h4>
-                  <p className="text-xs text-zinc-500">Only show guardian features</p>
+            <div className="bg-[#0F172A]/50 border border-[#0F766E]/20 rounded-[32px] p-8 shadow-xl">
+              <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-[#0F766E] mb-6">PREFERENCES</label>
+              <div className="space-y-8">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-bold text-[#E5E7EB]">Guardian mode</h4>
+                    <p className="text-xs text-[#9CA3AF]">Focus solely on helping others.</p>
+                  </div>
+                  <button
+                    onClick={() => handleUpdateRole(profile?.account_role !== "guardian")}
+                    className={`w-14 h-8 rounded-full transition-all relative ${profile?.account_role === 'guardian' ? 'bg-[#14B8A6]' : 'bg-[#070F1A] border border-[#0F766E]/30'}`}
+                  >
+                    <div className={`absolute top-1 w-6 h-6 rounded-full bg-white transition-all shadow-md ${profile?.account_role === 'guardian' ? 'left-7' : 'left-1'}`} />
+                  </button>
                 </div>
-                <button
-                  onClick={() => handleUpdateRole(profile?.account_role !== "guardian")}
-                  className={`w-12 h-6 rounded-full transition-all relative ${profile?.account_role === "guardian" ? 'bg-white' : 'bg-zinc-800'}`}
-                >
-                  <div className={`absolute top-1 w-4 h-4 rounded-full transition-all ${profile?.account_role === "guardian" ? 'right-1 bg-black' : 'left-1 bg-zinc-600'}`} />
-                </button>
+
+                <div className="pt-4 border-t border-[#0F766E]/10">
+                  <button onClick={handleSignOut} className="w-full py-4 bg-[#FF8559]/5 border border-[#FF8559]/20 text-[#FF8559] rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-[#FF8559] hover:text-white transition-all">
+                    Sign Out
+                  </button>
+                </div>
               </div>
             </div>
-
-            <button
-              onClick={handleSignOut}
-              className="w-full py-4 bg-red-950/20 border border-red-500/20 text-red-500 font-bold rounded-2xl hover:bg-red-500 hover:text-white transition-all uppercase text-sm tracking-widest"
-            >
-              Sign Out
-            </button>
           </div>
         </main>
       )}
 
       <style jsx global>{`
-          .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-          .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-          .custom-scrollbar::-webkit-scrollbar-thumb { background: #27272a; border-radius: 2px; }
-        `}</style>
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #27272a; border-radius: 2px; }
+      `}</style>
     </div>
   );
 }

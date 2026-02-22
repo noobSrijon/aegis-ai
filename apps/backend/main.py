@@ -367,6 +367,19 @@ async def add_guardian(
         return {"error": str(e)}, 400
 
 
+@app.delete("/api/guardians/{relationship_id}")
+async def delete_guardian(relationship_id: str, user=Depends(get_current_user)):
+    if not supabase:
+        return {"message": "Supabase not configured"}
+    try:
+        # Allow deletion if user is either the one who added (user_id) or the guardian (guardian_id)
+        res = supabase.table("guardians").delete().eq("id", relationship_id).or_(f"user_id.eq.{user.id},guardian_id.eq.{user.id}").execute()
+        return {"message": "Guardian relationship removed"}
+    except Exception as e:
+        print(f"Delete guardian error: {e}")
+        return {"error": str(e)}, 400
+
+
 @app.post("/api/threads")
 async def create_thread(data: ThreadCreate, user=Depends(get_current_user)):
     print(f"CREATE_THREAD: Received data={data} for user={user.id}")
