@@ -1,22 +1,24 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useRef } from "react";
 import { createClient } from "@/utils/supabase/client";
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 function LiveStatusContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const threadId = searchParams.get("threadId");
   const supabase = createClient();
+  const transcriptEndRef = useRef<HTMLDivElement>(null);
 
   const [risk, setRisk] = useState(45);
   const [logs, setLogs] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(!!threadId);
   const [sessionContext, setSessionContext] = useState("");
 
-  // Graph data state
-  const [graphData, setGraphData] = useState([
+  // Simulation graph data state
+  const [riskData, setRiskData] = useState([
     { time: "10:00", risk: 20 },
     { time: "10:05", risk: 35 },
     { time: "10:10", risk: 30 },
@@ -45,22 +47,18 @@ function LiveStatusContent() {
 
         if (res.ok) {
           const data = await res.json();
-          console.log("Thread data received:", data);
           setRisk(data.logs?.length > 0 ? 45 : 0);
           setLogs(data.logs || []);
           setSessionContext(data.initial_context || "");
 
-          const mappedGraphData = data.logs?.map((l: any) => ({
+          const mappedGraphData = data.logs?.map((l: any, idx: number) => ({
             time: new Date(l.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            risk: 30 + (Math.random() * 40)
-          })).slice(-10) || [];
+            risk: Math.min(100, Math.max(0, 30 + (idx * 5) % 40 + (Math.random() * 10)))
+          })).slice(-15) || [];
 
-          console.log("Mapped graph data:", mappedGraphData);
           if (mappedGraphData.length > 0) {
-            setGraphData(mappedGraphData);
+            setRiskData(mappedGraphData);
           }
-        } else {
-          console.error("API Error:", res.status, await res.text());
         }
       } catch (err) {
         console.error("Failed to fetch thread data:", err);
@@ -72,238 +70,138 @@ function LiveStatusContent() {
     fetchData();
   }, [threadId, supabase]);
 
-  // Simulate live risk factor changes only if NO threadId
+  // Scroll to bottom of transcript
   useEffect(() => {
-    if (threadId) return;
-    const interval = setInterval(() => {
-      setRisk(prev => {
-        const change = (Math.random() - 0.5) * 5;
-        return Math.min(100, Math.max(0, parseFloat((prev + change).toFixed(1))));
-      });
-    }, 3000);
-    return () => clearInterval(interval);
-  }, [threadId]);
-
-  // SVG dimensions for the graph
-  const width = 600;
-  const height = 300;
-  const padding = 40;
-
-  const points = graphData.map((d, i) => {
-    const x = padding + (i * (width - 2 * padding)) / (graphData.length - 1);
-    const y = height - padding - (d.risk * (height - 2 * padding)) / 100;
-    return `${x},${y}`;
-  }).join(" ");
+    transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [logs]);
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#070F1A] flex flex-col items-center justify-center gap-6">
-        <div className="h-16 w-16 border-4 border-[#14B8A6]/20 border-t-[#14B8A6] rounded-full animate-spin" />
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-6">
+        <div className="h-16 w-16 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
         <div className="text-center">
-          <h2 className="text-[#14B8A6] font-black uppercase tracking-[0.3em] text-sm animate-pulse">Decrypting Vault</h2>
-          <p className="text-[#9CA3AF] text-[10px] mt-2 font-mono opacity-50">Establishing Secure Sync Protocol...</p>
+          <h2 className="text-primary font-black uppercase tracking-[0.3em] text-sm animate-pulse">Syncing Protocol</h2>
+          <p className="text-slate-400 text-[10px] mt-2 font-mono opacity-50">Establishing Secure Transmission...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#070F1A] text-[#E5E7EB] font-sans selection:bg-[#14B8A6]/30 overflow-x-hidden relative">
-      {/* Background Halo */}
+    <div className="flex min-h-screen flex-col bg-background text-foreground font-sans selection:bg-primary/20 overflow-x-hidden relative">
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1000px] h-[1000px] bg-[#14B8A6]/5 rounded-full blur-[120px]" />
-        <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-[#14B8A6]/3 rounded-full blur-[80px]" />
-        <div className="absolute -bottom-[10%] -right-[10%] w-[40%] h-[40%] bg-[#FF8559]/3 rounded-full blur-[80px]" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1000px] h-[1000px] bg-primary/5 rounded-full blur-[120px]" />
       </div>
 
-      <nav className="fixed top-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 bg-[#0F172A]/80 backdrop-blur-xl border border-[#0F766E]/30 rounded-full shadow-[0_24px_60px_rgba(0,0,0,0.5)] flex items-center justify-between w-[90%] max-w-4xl">
+      <nav className="fixed top-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 bg-surface/80 backdrop-blur-xl border border-border rounded-full shadow-lg flex items-center gap-8">
         <div className="flex items-center gap-3">
-          <span className="w-1.5 h-6 bg-[#14B8A6] rounded-full" />
-          <h1 className="text-sm font-black uppercase tracking-widest text-[#E5E7EB]">
-            {threadId ? "Historical Signal Monitor" : "Live Status Protocol"}
-          </h1>
+          <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Live Status Content</span>
         </div>
-        <button
-          onClick={() => router.back()}
-          className="px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border border-[#0F766E]/50 text-[#9CA3AF] hover:text-[#E5E7EB] hover:border-[#14B8A6]/50"
-        >
-          Return to Hub
-        </button>
+        <div className="h-4 w-[1px] bg-border" />
+        <button onClick={() => router.push('/')} className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-primary transition-colors">Back to Vault</button>
       </nav>
 
       <main className="flex-1 flex flex-col pt-32 pb-12 px-6 max-w-6xl mx-auto w-full relative z-10">
         {sessionContext && (
-          <div className="mb-8 p-6 bg-[#0F172A]/50 border border-[#0F766E]/30 rounded-3xl backdrop-blur-sm">
-            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#14B8A6] block mb-2 opacity-60">Situation Context</span>
-            <p className="text-sm text-[#9CA3AF] italic">&quot;{sessionContext}&quot;</p>
+          <div className="mb-8 p-6 bg-surface border border-border rounded-3xl shadow-sm">
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 block mb-2 font-mono">Situation Context</span>
+            <p className="text-sm text-slate-700 italic">&quot;{sessionContext}&quot;</p>
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
-          <div className="lg:col-span-2 bg-[#0F172A]/50 border border-[#0F766E]/20 rounded-[32px] p-8 shadow-2xl backdrop-blur-sm relative overflow-hidden group">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#14B8A6]/30 to-transparent" />
-            <div className="flex justify-between items-center mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+          <div className="lg:col-span-1 bg-surface border border-border rounded-[32px] p-8 shadow-sm">
+            <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-6 font-mono">Evaluation</label>
+            <div className="space-y-8">
               <div>
-                <h2 className="text-xl font-black flex items-center gap-3">
-                  <span className="w-1.5 h-6 bg-[#14B8A6] rounded-full animate-pulse" />
-                  Risk Factor Timeline
-                </h2>
-                <p className="text-[#9CA3AF] text-[10px] font-black uppercase tracking-widest mt-1">
-                  {threadId ? "Recorded threat progression" : "Real-time threat evaluation"}
-                </p>
+                <h1 className="text-4xl font-black mb-2 flex items-baseline gap-2 text-slate-900">
+                  {Number(risk).toFixed(2)}%
+                  <span className="text-xs text-slate-400 font-normal uppercase tracking-widest">Risk Level</span>
+                </h1>
+                <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary transition-all duration-1000 shadow-[0_0_12px_rgba(13,148,136,0.3)]"
+                    style={{ width: `${risk}%` }}
+                  />
+                </div>
               </div>
-              <div className="text-right">
-                <span className="text-xs font-black uppercase tracking-widest text-[#14B8A6] bg-[#14B8A6]/10 px-3 py-1 rounded-full border border-[#14B8A6]/20">
-                  {threadId ? "Static Vault Data" : "Live Syncing"}
-                </span>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 bg-slate-50 border border-border rounded-2xl">
+                  <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Status</p>
+                  <p className={`text-sm font-bold uppercase tracking-widest ${risk > 70 ? 'text-red-600' : 'text-primary'}`}>
+                    {risk > 70 ? 'CRITICAL' : 'SECURE'}
+                  </p>
+                </div>
+                <div className="p-4 bg-slate-50 border border-border rounded-2xl">
+                  <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Signal</p>
+                  <p className="text-sm font-bold text-slate-900">ENCRYPTED</p>
+                </div>
               </div>
-            </div>
-
-            <div className="relative w-full h-[350px] mt-4 flex items-center justify-center">
-              <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="overflow-visible">
-                {[0, 25, 50, 75, 100].map((v) => {
-                  const y = height - padding - (v * (height - 2 * padding)) / 100;
-                  return (
-                    <g key={v}>
-                      <line x1={padding} y1={y} x2={width - padding} y2={y} stroke="#0F766E" strokeWidth="0.5" strokeDasharray="4 4" opacity="0.2" />
-                      <text x={padding - 10} y={y + 4} textAnchor="end" fontSize="10" fill="#4B5563" fontWeight="bold">{v}%</text>
-                    </g>
-                  );
-                })}
-
-                {graphData.map((d, i) => {
-                  const x = padding + (i * (width - 2 * padding)) / (graphData.length - 1);
-                  return (
-                    <g key={i}>
-                      <line x1={x} y1={padding} x2={x} y2={height - padding} stroke="#0F766E" strokeWidth="0.5" strokeDasharray="4 4" opacity="0.1" />
-                      <text x={x} y={height - padding + 20} textAnchor="middle" fontSize="10" fill="#4B5563" fontWeight="bold">{d.time}</text>
-                    </g>
-                  );
-                })}
-
-                <polyline
-                  points={points}
-                  fill="none"
-                  stroke="#14B8A6"
-                  strokeWidth="3"
-                  strokeLinejoin="round"
-                  className="drop-shadow-[0_0_8px_rgba(20,184,166,0.5)]"
-                />
-
-                <path
-                  d={`M ${padding},${height - padding} L ${points} L ${width - padding},${height - padding} Z`}
-                  fill="url(#gradient)"
-                  opacity="0.2"
-                />
-
-                <defs>
-                  <linearGradient id="gradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#14B8A6" stopOpacity="0.5" />
-                    <stop offset="100%" stopColor="#14B8A6" stopOpacity="0" />
-                  </linearGradient>
-                </defs>
-
-                {graphData.map((d, i) => {
-                  const x = padding + (i * (width - 2 * padding)) / (graphData.length - 1);
-                  const y = height - padding - (d.risk * (height - 2 * padding)) / 100;
-                  return (
-                    <circle
-                      key={i}
-                      cx={x}
-                      cy={y}
-                      r="4"
-                      fill="#070F1A"
-                      stroke="#14B8A6"
-                      strokeWidth="2"
-                      className="transition-all hover:r-6 cursor-pointer"
-                    >
-                      <title>{`Risk: ${d.risk}% at ${d.time}`}</title>
-                    </circle>
-                  );
-                })}
-              </svg>
             </div>
           </div>
 
-          <div className="bg-[#0F172A]/50 border border-[#0F766E]/20 rounded-[32px] p-8 shadow-2xl backdrop-blur-sm flex flex-col items-center justify-between relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-full h-1 bg-gradient-to-r from-transparent via-[#FF8559]/30 to-transparent" />
-
-            <div className="w-full text-center mb-8">
-              <h2 className="text-xl font-black flex items-center justify-center gap-3">
-                <span className="w-1.5 h-6 bg-[#FF8559] rounded-full" />
-                Risk Severity
-              </h2>
-              <p className="text-[#9CA3AF] text-[10px] font-black uppercase tracking-widest mt-1">Classification Status</p>
-            </div>
-
-            <div className="flex flex-col gap-10 items-center justify-center flex-1">
-              <div className="group relative">
-                <div className={`w-28 h-28 rounded-full border-4 flex items-center justify-center transition-all duration-500 ${risk > 70 ? 'bg-red-500/20 border-red-500 shadow-[0_0_40px_rgba(239,68,68,0.4)]' : 'bg-red-500/5 border-red-500/20'}`}>
-                  <span className={`text-[10px] font-black uppercase tracking-widest ${risk > 70 ? 'text-red-500' : 'text-red-500/30'}`}>HIGH</span>
-                </div>
-                {risk > 70 && <div className="absolute -inset-2 rounded-full border border-red-500/30 animate-ping" />}
-              </div>
-
-              <div className="group relative">
-                <div className={`w-24 h-24 rounded-full border-4 flex items-center justify-center transition-all duration-500 ${risk > 40 && risk <= 70 ? 'bg-yellow-500/20 border-yellow-500 shadow-[0_0_40px_rgba(234,179,8,0.4)]' : 'bg-yellow-500/5 border-yellow-500/20'}`}>
-                  <span className={`text-[10px] font-black uppercase tracking-widest ${risk > 40 && risk <= 70 ? 'text-yellow-500' : 'text-yellow-500/30'}`}>MEDIUM</span>
-                </div>
-                {risk > 40 && risk <= 70 && <div className="absolute -inset-2 rounded-full border border-yellow-500/30 animate-ping" />}
-              </div>
-
-              <div className="group relative">
-                <div className={`w-20 h-20 rounded-full border-4 flex items-center justify-center transition-all duration-500 ${risk <= 40 ? 'bg-green-500/20 border-green-500 shadow-[0_0_40px_rgba(34,197,94,0.4)]' : 'bg-green-500/5 border-green-500/20'}`}>
-                  <span className={`text-[10px] font-black uppercase tracking-widest ${risk <= 40 ? 'text-green-500' : 'text-green-500/30'}`}>LOW</span>
-                </div>
-                {risk <= 40 && <div className="absolute -inset-2 rounded-full border border-green-500/30 animate-ping" />}
-              </div>
-            </div>
-
-            <div className="w-full mt-10 p-6 bg-[#070F1A] border border-[#0F766E]/20 rounded-2xl text-center">
-              <span className="text-4xl font-black text-white">{risk}%</span>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#9CA3AF] mt-2">Cumulative Threat Level</p>
+          <div className="lg:col-span-2 bg-surface border border-border rounded-[32px] p-8 shadow-sm flex flex-col">
+            <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-6 font-mono">Risk Factor Timeline</label>
+            <div className="flex-1 min-h-[300px] relative">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={riskData}>
+                  <defs>
+                    <linearGradient id="colorRisk" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--teal)" stopOpacity={0.2} />
+                      <stop offset="95%" stopColor="var(--teal)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="time" hide />
+                  <YAxis domain={[0, 100]} hide />
+                  <Tooltip
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        return (
+                          <div className="bg-white/90 backdrop-blur-md border border-border p-3 rounded-xl shadow-xl">
+                            <p className="text-xs font-bold text-slate-900">{Number(payload[0].value).toFixed(2)}% Risk</p>
+                            <p className="text-[9px] text-slate-400 uppercase font-bold">{payload[0].payload.time}</p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Area type="monotone" dataKey="risk" stroke="var(--teal)" strokeWidth={3} fillOpacity={1} fill="url(#colorRisk)" animationDuration={1000} />
+                </AreaChart>
+              </ResponsiveContainer>
             </div>
           </div>
         </div>
 
-        {threadId && (
-          <div className="mt-8 bg-[#0F172A]/50 border border-[#0F766E]/20 rounded-[32px] p-8 shadow-2xl backdrop-blur-sm relative overflow-hidden">
-            <h2 className="text-xl font-black mb-6 flex items-center gap-3">
-              <span className="w-1.5 h-6 bg-[#14B8A6] rounded-full" />
-              Intelligence Feed
-            </h2>
-            <div className="space-y-4 max-h-[600px] overflow-y-auto pr-4 custom-scrollbar">
-              {logs.length === 0 ? (
-                <div className="py-20 text-center border border-dashed border-[#0F766E]/20 rounded-2xl opacity-50">
-                  <p className="text-sm font-mono uppercase tracking-widest text-[#9CA3AF]">Zero signals captured for this session</p>
-                </div>
-              ) : (
-                logs.map((l, i) => (
-                  <div key={i} className="flex gap-6 border-l-2 border-[#14B8A6]/20 pl-6 py-3 hover:bg-[#14B8A6]/5 transition-all group">
-                    <div className="flex-shrink-0 text-[10px] font-mono text-[#0F766E] pt-1 opacity-50 group-hover:opacity-100 transition-opacity">
-                      {new Date(l.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                    </div>
-                    <div>
-                      <span className="text-[9px] font-black uppercase text-[#14B8A6] tracking-[0.2em] block mb-2">{l.speaker_label || 'USER'}</span>
-                      <p className="text-sm text-[#E5E7EB] leading-relaxed max-w-2xl">{l.content}</p>
-                    </div>
+        <div className="bg-surface border border-border rounded-[32px] p-8 shadow-sm flex flex-col max-h-[600px]">
+          <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-6 font-mono">Session Intelligence Feed</label>
+          <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2">
+            {logs.length === 0 ? (
+              <div className="py-20 text-center border border-dashed border-border rounded-2xl opacity-50">
+                <p className="text-sm font-mono uppercase tracking-widest text-slate-400 italic">No signals recorded during this session</p>
+              </div>
+            ) : (
+              logs.map((l: any, i: number) => (
+                <div key={i} className="flex gap-6 border-l-2 border-primary/20 pl-6 py-3 hover:bg-slate-50 transition-all group">
+                  <div className="flex-shrink-0 text-[10px] font-mono text-slate-400 pt-1 opacity-50 group-hover:opacity-100 transition-opacity">
+                    {new Date(l.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                   </div>
-                ))
-              )}
-            </div>
+                  <div>
+                    <span className="text-[9px] font-black uppercase text-primary tracking-[0.2em] block mb-2">{l.speaker_label || 'USER'}</span>
+                    <p className="text-sm text-slate-700 leading-relaxed max-w-2xl">{l.content}</p>
+                  </div>
+                </div>
+              ))
+            )}
+            <div ref={transcriptEndRef} />
           </div>
-        )}
+        </div>
       </main>
 
-      <footer className="py-8 text-center text-[8px] font-black uppercase tracking-[0.4em] text-[#0F766E]/60">
+      <footer className="py-8 text-center text-[8px] font-black uppercase tracking-[0.4em] text-slate-400 opacity-60">
         Secure Transmission Mode // Vault Analysis Protocol
       </footer>
-      <style jsx global>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #0F766E; border-radius: 2px; }
-      `}</style>
     </div>
   );
 }
@@ -311,8 +209,8 @@ function LiveStatusContent() {
 export default function LiveStatusPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-[#070F1A] flex items-center justify-center">
-        <div className="h-12 w-12 border-4 border-[#14B8A6]/20 border-t-[#14B8A6] rounded-full animate-spin" />
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="h-12 w-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
       </div>
     }>
       <LiveStatusContent />

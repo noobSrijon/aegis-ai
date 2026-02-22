@@ -1,28 +1,34 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #070F1A;
-  --surface: #0F172A;
-  --teal: #14B8A6;
-  --teal-bright: #22C9B7;
-  --teal-dark: #0F766E;
-  --text-primary: #E5E7EB;
-  --text-secondary: #9CA3AF;
-  --accent-warm: #FF8559;
+  --bg: #F8FAFC;
+  --surface: #FFFFFF;
+  --surface-alt: #F1F5F9;
+  --teal: #0D9488;
+  --teal-bright: #0F766E;
+  --teal-dark: #115E59;
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+  --accent-warm: #F97316;
+  --border: #E2E8F0;
+  --shadow: 0 10px 15px -3px rgb(0 0 0 / 0.05), 0 4px 6px -4px rgb(0 0 0 / 0.05);
 }
 
 @theme inline {
   --color-background: var(--bg);
   --color-foreground: var(--text-primary);
+  --color-surface: var(--surface);
+  --color-surface-alt: var(--surface-alt);
+  --color-primary: var(--teal);
+  --color-secondary: var(--text-secondary);
+  --color-border: var(--border);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: var(--bg);
-    --foreground: var(--text-primary);
-  }
+:root {
+  --background: var(--bg);
+  --foreground: var(--text-primary);
 }
 
 body {
@@ -55,7 +61,7 @@ body {
   height: 100%;
   background: linear-gradient(90deg,
       transparent,
-      rgba(255, 255, 255, 0.05),
+      rgba(255, 255, 255, 0.6),
       transparent);
   animation: shimmer 2s infinite;
 }
@@ -67,22 +73,22 @@ body {
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.1);
+  background: rgba(226, 232, 240, 0.5);
   border-radius: 10px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(20, 184, 166, 0.2);
+  background: rgba(13, 148, 136, 0.2);
   border-radius: 10px;
-  border: 1px solid rgba(20, 184, 166, 0.1);
+  border: 1px solid rgba(13, 148, 136, 0.1);
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(20, 184, 166, 0.4);
+  background: rgba(13, 148, 136, 0.4);
 }
 
 /* For Firefox */
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: rgba(20, 184, 166, 0.2) transparent;
+  scrollbar-color: rgba(13, 148, 136, 0.2) transparent;
 }
