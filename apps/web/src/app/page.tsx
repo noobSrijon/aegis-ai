@@ -44,6 +44,7 @@ export default function Home() {
 
   const supabase = createClient();
   const router = useRouter();
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   const ws = useRef<WebSocket | null>(null);
   const audioContext = useRef<AudioContext | null>(null);
@@ -60,11 +61,11 @@ export default function Home() {
       const headers = { "Authorization": `Bearer ${session?.access_token}` };
 
       const [profRes, histRes, guardRes, myGuardRes, notifRes] = await Promise.all([
-        fetch("http://localhost:8000/api/profile", { headers }),
-        fetch("http://localhost:8000/api/history", { headers }),
-        fetch("http://localhost:8000/api/guarding", { headers }),
-        fetch("http://localhost:8000/api/my-guardians", { headers }),
-        fetch("http://localhost:8000/api/notifications", { headers })
+        fetch(`${API_URL}/api/profile`, { headers }),
+        fetch(`${API_URL}/api/history`, { headers }),
+        fetch(`${API_URL}/api/guarding`, { headers }),
+        fetch(`${API_URL}/api/my-guardians`, { headers }),
+        fetch(`${API_URL}/api/notifications`, { headers })
       ]);
 
       const [profData, histData, guardData, myGuardData, notifData] = await Promise.all([
@@ -111,7 +112,7 @@ export default function Home() {
 
   const markNotificationRead = async (id: string) => {
     const { data: { session } } = await supabase.auth.getSession();
-    await fetch(`http://localhost:8000/api/notifications/read/${id}`, {
+    await fetch(`${API_URL}/api/notifications/read/${id}`, {
       method: "POST",
       headers: { "Authorization": `Bearer ${session?.access_token}` }
     });
@@ -120,7 +121,7 @@ export default function Home() {
 
   const handleAcceptGuardian = async (id: string) => {
     const { data: { session } } = await supabase.auth.getSession();
-    await fetch(`http://localhost:8000/api/guardians/accept/${id}`, {
+    await fetch(`${API_URL}/api/guardians/accept/${id}`, {
       method: "POST",
       headers: { "Authorization": `Bearer ${session?.access_token}` }
     });
@@ -132,7 +133,7 @@ export default function Home() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      const res = await fetch(`http://localhost:8000/api/guardians/${id}`, {
+      const res = await fetch(`${API_URL}/api/guardians/${id}`, {
         method: "DELETE",
         headers: { "Authorization": `Bearer ${session?.access_token}` }
       });
@@ -154,7 +155,7 @@ export default function Home() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      const res = await fetch(`http://localhost:8000/api/guarding/threads/${wardId}`, {
+      const res = await fetch(`${API_URL}/api/guarding/threads/${wardId}`, {
         headers: { "Authorization": `Bearer ${session?.access_token}` }
       });
 
@@ -177,7 +178,7 @@ export default function Home() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
       const role = isGuardian ? "guardian" : "both";
-      const res = await fetch("http://localhost:8000/api/profile/role", {
+      const res = await fetch(`${API_URL}/api/profile/role`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${session?.access_token}`,
@@ -257,7 +258,7 @@ export default function Home() {
       }
 
       console.log("Creating session thread...");
-      const res = await fetch("http://localhost:8000/api/threads", {
+      const res = await fetch(`${API_URL}/api/threads`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${session?.access_token}`,
@@ -284,7 +285,9 @@ export default function Home() {
 
       setThreadId(data.id);
 
-      const wsUrl = `ws://127.0.0.1:8000/ws/${data.id}`;
+      const wsProtocol = API_URL.startsWith("https") ? "wss" : "ws";
+      const host = API_URL.replace(/^https?:\/\//, "");
+      const wsUrl = `${wsProtocol}://${host}/ws/${data.id}`;
       console.log("Attempting WebSocket connection to:", wsUrl);
 
       ws.current = new WebSocket(wsUrl);
@@ -395,7 +398,7 @@ export default function Home() {
         if (!session) return;
         const formData = new FormData();
         formData.append("file", new Blob(["dummy"], { type: "audio/wav" }), "voice.wav");
-        await fetch("http://localhost:8000/api/enroll-voice", {
+        await fetch(`${API_URL}/api/enroll-voice`, {
           method: "POST",
           headers: { "Authorization": `Bearer ${session?.access_token}` },
           body: formData
@@ -416,7 +419,7 @@ export default function Home() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
-      await fetch("http://localhost:8000/api/guardians/add", {
+      await fetch(`${API_URL}/api/guardians/add`, {
         method: "POST",
         headers: { "Authorization": `Bearer ${session?.access_token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ guardian_email: guardianEmail, guardian_phone: guardianPhone })

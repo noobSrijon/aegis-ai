@@ -42,7 +42,8 @@ function LiveStatusContent() {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
 
-        const res = await fetch(`http://localhost:8000/api/threads/${threadId}`, {
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        const res = await fetch(`${API_URL}/api/threads/${threadId}`, {
           headers: { "Authorization": `Bearer ${session?.access_token}` }
         });
 
