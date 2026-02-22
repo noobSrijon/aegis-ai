@@ -1,6 +1,7 @@
 import os
 import json
 import asyncio
+from typing import Optional
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -11,6 +12,7 @@ from supabase import create_client, Client
 from supabase.lib.client_options import ClientOptions
 import assemblyai as aai
 from auth_utils import get_current_user
+from risk_analysis import assess_danger
 from fastapi import Depends
 from pydantic import BaseModel
 
@@ -65,6 +67,21 @@ async def health_check():
     return {"status": "ok"}
 
 
+class TestRiskInput(BaseModel):
+    transcript: str
+    location: Optional[dict] = None
+
+
+@app.post("/api/test-risk")
+async def test_risk_assessment(data: TestRiskInput):
+    """
+    Test the Groq LLM risk analysis without a WebSocket session.
+    Use this to see how different transcripts are scored (0-100, with level: low/medium/high/critical).
+    """
+    result = await assess_danger(data.transcript, location=data.location)
+    return result
+
+
 @app.websocket("/ws/{thread_id}")
 async def monitor_audio(websocket: WebSocket, thread_id: str):
     print(f"WS CONNECTION ATTEMPT: thread_id={thread_id}")
@@ -99,9 +116,15 @@ async def monitor_audio(websocket: WebSocket, thread_id: str):
                 if is_final and supabase:
                     supabase.table("logs").insert(
                         {"thread_id": thread_id, "content": sentence, "latitude": lat, "longitude": lon}).execute()
-                mock_risk = 95 if "help" in sentence.lower() else (45 if "risk" in sentence.lower() else 10)
+                # Use Groq LLM for risk assessment
+                loc = {"lat": lat, "lon": lon} if (lat is not None and lon is not None) else None
+                result = await assess_danger(sentence, location=loc)
+                risk_score = int(result["score"])
+                if risk_score >= 65:
+                    await websocket.send_json({"risk": risk_score, "action": "Analyzing..."})
+                action_text = result["reason"] or "Analyzing..."
                 await websocket.send_json(
-                    {"transcript": sentence, "is_final": is_final, "risk": mock_risk, "action": "Analyzing..."})
+                    {"transcript": sentence, "is_final": is_final, "risk": risk_score, "action": action_text})
             except Exception as e:
                 print(f"WS SEND ERROR: {e}")
 
@@ -136,6 +159,20 @@ async def monitor_audio(websocket: WebSocket, thread_id: str):
                 msg = json.loads(data["text"])
                 if msg.get("type") == "location":
                     session_location["lat"], session_location["lon"] = msg.get("lat"), msg.get("lon")
+                elif msg.get("type") == "chat":
+                    text = msg.get("text", "").strip()
+                    if text:
+                        try:
+                            loc = {"lat": session_location["lat"], "lon": session_location["lon"]} if (session_location["lat"] is not None and session_location["lon"] is not None) else None
+                            result = await assess_danger(text, location=loc)
+                            risk_score = int(result["score"])
+                            action_text = result["reason"] or "Analyzed."
+                            await websocket.send_json({"is_final": True, "risk": risk_score, "action": action_text})
+                            if supabase:
+                                supabase.table("logs").insert({"thread_id": thread_id, "content": text, "latitude": session_location["lat"], "longitude": session_location["lon"]}).execute()
+                        except Exception as e:
+                            print(f"Chat assess error: {e}")
+                            await websocket.send_json({"transcript": text, "is_final": True, "risk": 0, "action": f"Assessment failed: {e}"})
     except WebSocketDisconnect:
         print(f"Disconnected: {thread_id}")
     finally:
