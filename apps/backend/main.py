@@ -236,6 +236,64 @@ async def update_profile_role(data: RoleUpdate, user=Depends(get_current_user)):
         return {"error": str(e)}, 400
 
 
+async def check_is_guardian(guardian_id: str, ward_id: str) -> bool:
+    """Helper to check if a user is an active guardian for another user."""
+    if not supabase: return False
+    try:
+        res = supabase.table("guardians").select("status").eq("guardian_id", guardian_id).eq("user_id", ward_id).eq("status", "active").execute()
+        return len(res.data) > 0
+    except Exception as e:
+        print(f"Guardian check error: {e}")
+        return False
+
+
+@app.get("/api/guarding/threads/{user_id}")
+async def get_ward_threads(user_id: str, user=Depends(get_current_user)):
+    """Fetch threads for a ward, only if the current user is their active guardian."""
+    if not supabase: return []
+    
+    is_guardian = await check_is_guardian(user.id, user_id)
+    if not is_guardian:
+        raise HTTPException(status_code=403, detail="Not authorized to view this user's threads")
+    
+    try:
+        res = supabase.table("threads").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
+        return res.data
+    except Exception as e:
+        print(f"Ward threads error: {e}")
+        return []
+
+
+@app.get("/api/threads/{thread_id}")
+async def get_thread_details(thread_id: str, user=Depends(get_current_user)):
+    """Fetch a single thread with its logs. User must be owner or an active guardian."""
+    if not supabase: return None
+    
+    try:
+        # Get thread to check ownership
+        thread_res = supabase.table("threads").select("*").eq("id", thread_id).execute()
+        if not thread_res.data:
+            raise HTTPException(status_code=404, detail="Thread not found")
+        
+        thread = thread_res.data[0]
+        owner_id = thread["user_id"]
+        
+        if owner_id != user.id:
+            is_guardian = await check_is_guardian(user.id, owner_id)
+            if not is_guardian:
+                raise HTTPException(status_code=403, detail="Not authorized to view this thread")
+        
+        # Fetch logs
+        logs_res = supabase.table("logs").select("*").eq("thread_id", thread_id).order("created_at", desc=False).execute()
+        thread["logs"] = logs_res.data
+        return thread
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Thread details error: {e}")
+        return None
+
+
 @app.get("/api/history")
 async def get_history(user=Depends(get_current_user)):
     if not supabase:

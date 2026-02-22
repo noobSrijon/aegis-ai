@@ -1,24 +1,21 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { createClient } from "@/utils/supabase/client";
 
-export default function LiveStatusPage() {
+function LiveStatusContent() {
   const router = useRouter();
-  const [risk, setRisk] = useState(45); // Initial sample risk percentage
+  const searchParams = useSearchParams();
+  const threadId = searchParams.get("threadId");
+  const supabase = createClient();
 
-  // Simulate live risk factor changes
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setRisk(prev => {
-        const change = (Math.random() - 0.5) * 5;
-        return Math.min(100, Math.max(0, parseFloat((prev + change).toFixed(1))));
-      });
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
+  const [risk, setRisk] = useState(45);
+  const [logs, setLogs] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(!!threadId);
+  const [sessionContext, setSessionContext] = useState("");
 
-  // Mock data for the graph
+  // Graph data state
   const [graphData, setGraphData] = useState([
     { time: "10:00", risk: 20 },
     { time: "10:05", risk: 35 },
@@ -28,6 +25,64 @@ export default function LiveStatusPage() {
     { time: "10:25", risk: 65 },
     { time: "10:30", risk: 45 },
   ]);
+
+  // Fetch real data if threadId is provided
+  useEffect(() => {
+    if (!threadId) return;
+
+    const fetchData = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          console.log("No active session found in live-status");
+          return;
+        }
+
+        console.log(`Fetching thread details for: ${threadId}`);
+        const res = await fetch(`http://localhost:8000/api/threads/${threadId}`, {
+          headers: { "Authorization": `Bearer ${session?.access_token}` }
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          console.log("Thread data received:", data);
+          setRisk(data.logs?.length > 0 ? 45 : 0);
+          setLogs(data.logs || []);
+          setSessionContext(data.initial_context || "");
+
+          const mappedGraphData = data.logs?.map((l: any) => ({
+            time: new Date(l.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            risk: 30 + (Math.random() * 40)
+          })).slice(-10) || [];
+
+          console.log("Mapped graph data:", mappedGraphData);
+          if (mappedGraphData.length > 0) {
+            setGraphData(mappedGraphData);
+          }
+        } else {
+          console.error("API Error:", res.status, await res.text());
+        }
+      } catch (err) {
+        console.error("Failed to fetch thread data:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [threadId, supabase]);
+
+  // Simulate live risk factor changes only if NO threadId
+  useEffect(() => {
+    if (threadId) return;
+    const interval = setInterval(() => {
+      setRisk(prev => {
+        const change = (Math.random() - 0.5) * 5;
+        return Math.min(100, Math.max(0, parseFloat((prev + change).toFixed(1))));
+      });
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [threadId]);
 
   // SVG dimensions for the graph
   const width = 600;
@@ -39,6 +94,18 @@ export default function LiveStatusPage() {
     const y = height - padding - (d.risk * (height - 2 * padding)) / 100;
     return `${x},${y}`;
   }).join(" ");
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#070F1A] flex flex-col items-center justify-center gap-6">
+        <div className="h-16 w-16 border-4 border-[#14B8A6]/20 border-t-[#14B8A6] rounded-full animate-spin" />
+        <div className="text-center">
+          <h2 className="text-[#14B8A6] font-black uppercase tracking-[0.3em] text-sm animate-pulse">Decrypting Vault</h2>
+          <p className="text-[#9CA3AF] text-[10px] mt-2 font-mono opacity-50">Establishing Secure Sync Protocol...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-[#070F1A] text-[#E5E7EB] font-sans selection:bg-[#14B8A6]/30 overflow-x-hidden relative">
@@ -52,20 +119,28 @@ export default function LiveStatusPage() {
       <nav className="fixed top-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 bg-[#0F172A]/80 backdrop-blur-xl border border-[#0F766E]/30 rounded-full shadow-[0_24px_60px_rgba(0,0,0,0.5)] flex items-center justify-between w-[90%] max-w-4xl">
         <div className="flex items-center gap-3">
           <span className="w-1.5 h-6 bg-[#14B8A6] rounded-full" />
-          <h1 className="text-sm font-black uppercase tracking-widest text-[#E5E7EB]">Live Status Protocol</h1>
+          <h1 className="text-sm font-black uppercase tracking-widest text-[#E5E7EB]">
+            {threadId ? "Historical Signal Monitor" : "Live Status Protocol"}
+          </h1>
         </div>
         <button
           onClick={() => router.back()}
           className="px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border border-[#0F766E]/50 text-[#9CA3AF] hover:text-[#E5E7EB] hover:border-[#14B8A6]/50"
         >
-          Back to Vault
+          Return to Hub
         </button>
       </nav>
 
       <main className="flex-1 flex flex-col pt-32 pb-12 px-6 max-w-6xl mx-auto w-full relative z-10">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-full">
-          
-          {/* Left Column: Line Graph */}
+        {sessionContext && (
+          <div className="mb-8 p-6 bg-[#0F172A]/50 border border-[#0F766E]/30 rounded-3xl backdrop-blur-sm">
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#14B8A6] block mb-2 opacity-60">Situation Context</span>
+            <p className="text-sm text-[#9CA3AF] italic">&quot;{sessionContext}&quot;</p>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
           <div className="lg:col-span-2 bg-[#0F172A]/50 border border-[#0F766E]/20 rounded-[32px] p-8 shadow-2xl backdrop-blur-sm relative overflow-hidden group">
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#14B8A6]/30 to-transparent" />
             <div className="flex justify-between items-center mb-8">
@@ -74,16 +149,19 @@ export default function LiveStatusPage() {
                   <span className="w-1.5 h-6 bg-[#14B8A6] rounded-full animate-pulse" />
                   Risk Factor Timeline
                 </h2>
-                <p className="text-[#9CA3AF] text-[10px] font-black uppercase tracking-widest mt-1">Real-time threat evaluation</p>
+                <p className="text-[#9CA3AF] text-[10px] font-black uppercase tracking-widest mt-1">
+                  {threadId ? "Recorded threat progression" : "Real-time threat evaluation"}
+                </p>
               </div>
               <div className="text-right">
-                <span className="text-xs font-black uppercase tracking-widest text-[#14B8A6] bg-[#14B8A6]/10 px-3 py-1 rounded-full border border-[#14B8A6]/20">Live Syncing</span>
+                <span className="text-xs font-black uppercase tracking-widest text-[#14B8A6] bg-[#14B8A6]/10 px-3 py-1 rounded-full border border-[#14B8A6]/20">
+                  {threadId ? "Static Vault Data" : "Live Syncing"}
+                </span>
               </div>
             </div>
 
             <div className="relative w-full h-[350px] mt-4 flex items-center justify-center">
               <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="overflow-visible">
-                {/* Grid Lines */}
                 {[0, 25, 50, 75, 100].map((v) => {
                   const y = height - padding - (v * (height - 2 * padding)) / 100;
                   return (
@@ -94,7 +172,6 @@ export default function LiveStatusPage() {
                   );
                 })}
 
-                {/* Vertical Lines */}
                 {graphData.map((d, i) => {
                   const x = padding + (i * (width - 2 * padding)) / (graphData.length - 1);
                   return (
@@ -105,7 +182,6 @@ export default function LiveStatusPage() {
                   );
                 })}
 
-                {/* Line Path */}
                 <polyline
                   points={points}
                   fill="none"
@@ -115,7 +191,6 @@ export default function LiveStatusPage() {
                   className="drop-shadow-[0_0_8px_rgba(20,184,166,0.5)]"
                 />
 
-                {/* Area under the line */}
                 <path
                   d={`M ${padding},${height - padding} L ${points} L ${width - padding},${height - padding} Z`}
                   fill="url(#gradient)"
@@ -129,7 +204,6 @@ export default function LiveStatusPage() {
                   </linearGradient>
                 </defs>
 
-                {/* Data Points */}
                 {graphData.map((d, i) => {
                   const x = padding + (i * (width - 2 * padding)) / (graphData.length - 1);
                   const y = height - padding - (d.risk * (height - 2 * padding)) / 100;
@@ -152,10 +226,9 @@ export default function LiveStatusPage() {
             </div>
           </div>
 
-          {/* Right Column: Risk Indicators */}
           <div className="bg-[#0F172A]/50 border border-[#0F766E]/20 rounded-[32px] p-8 shadow-2xl backdrop-blur-sm flex flex-col items-center justify-between relative overflow-hidden">
             <div className="absolute top-0 right-0 w-full h-1 bg-gradient-to-r from-transparent via-[#FF8559]/30 to-transparent" />
-            
+
             <div className="w-full text-center mb-8">
               <h2 className="text-xl font-black flex items-center justify-center gap-3">
                 <span className="w-1.5 h-6 bg-[#FF8559] rounded-full" />
@@ -165,26 +238,23 @@ export default function LiveStatusPage() {
             </div>
 
             <div className="flex flex-col gap-10 items-center justify-center flex-1">
-              {/* High Risk Circle */}
               <div className="group relative">
                 <div className={`w-28 h-28 rounded-full border-4 flex items-center justify-center transition-all duration-500 ${risk > 70 ? 'bg-red-500/20 border-red-500 shadow-[0_0_40px_rgba(239,68,68,0.4)]' : 'bg-red-500/5 border-red-500/20'}`}>
-                   <span className={`text-[10px] font-black uppercase tracking-widest ${risk > 70 ? 'text-red-500' : 'text-red-500/30'}`}>HIGH</span>
+                  <span className={`text-[10px] font-black uppercase tracking-widest ${risk > 70 ? 'text-red-500' : 'text-red-500/30'}`}>HIGH</span>
                 </div>
                 {risk > 70 && <div className="absolute -inset-2 rounded-full border border-red-500/30 animate-ping" />}
               </div>
 
-              {/* Medium Risk Circle */}
               <div className="group relative">
                 <div className={`w-24 h-24 rounded-full border-4 flex items-center justify-center transition-all duration-500 ${risk > 40 && risk <= 70 ? 'bg-yellow-500/20 border-yellow-500 shadow-[0_0_40px_rgba(234,179,8,0.4)]' : 'bg-yellow-500/5 border-yellow-500/20'}`}>
-                   <span className={`text-[10px] font-black uppercase tracking-widest ${risk > 40 && risk <= 70 ? 'text-yellow-500' : 'text-yellow-500/30'}`}>MEDIUM</span>
+                  <span className={`text-[10px] font-black uppercase tracking-widest ${risk > 40 && risk <= 70 ? 'text-yellow-500' : 'text-yellow-500/30'}`}>MEDIUM</span>
                 </div>
                 {risk > 40 && risk <= 70 && <div className="absolute -inset-2 rounded-full border border-yellow-500/30 animate-ping" />}
               </div>
 
-              {/* Low Risk Circle */}
               <div className="group relative">
                 <div className={`w-20 h-20 rounded-full border-4 flex items-center justify-center transition-all duration-500 ${risk <= 40 ? 'bg-green-500/20 border-green-500 shadow-[0_0_40px_rgba(34,197,94,0.4)]' : 'bg-green-500/5 border-green-500/20'}`}>
-                   <span className={`text-[10px] font-black uppercase tracking-widest ${risk <= 40 ? 'text-green-500' : 'text-green-500/30'}`}>LOW</span>
+                  <span className={`text-[10px] font-black uppercase tracking-widest ${risk <= 40 ? 'text-green-500' : 'text-green-500/30'}`}>LOW</span>
                 </div>
                 {risk <= 40 && <div className="absolute -inset-2 rounded-full border border-green-500/30 animate-ping" />}
               </div>
@@ -195,13 +265,57 @@ export default function LiveStatusPage() {
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#9CA3AF] mt-2">Cumulative Threat Level</p>
             </div>
           </div>
-
         </div>
+
+        {threadId && (
+          <div className="mt-8 bg-[#0F172A]/50 border border-[#0F766E]/20 rounded-[32px] p-8 shadow-2xl backdrop-blur-sm relative overflow-hidden">
+            <h2 className="text-xl font-black mb-6 flex items-center gap-3">
+              <span className="w-1.5 h-6 bg-[#14B8A6] rounded-full" />
+              Intelligence Feed
+            </h2>
+            <div className="space-y-4 max-h-[600px] overflow-y-auto pr-4 custom-scrollbar">
+              {logs.length === 0 ? (
+                <div className="py-20 text-center border border-dashed border-[#0F766E]/20 rounded-2xl opacity-50">
+                  <p className="text-sm font-mono uppercase tracking-widest text-[#9CA3AF]">Zero signals captured for this session</p>
+                </div>
+              ) : (
+                logs.map((l, i) => (
+                  <div key={i} className="flex gap-6 border-l-2 border-[#14B8A6]/20 pl-6 py-3 hover:bg-[#14B8A6]/5 transition-all group">
+                    <div className="flex-shrink-0 text-[10px] font-mono text-[#0F766E] pt-1 opacity-50 group-hover:opacity-100 transition-opacity">
+                      {new Date(l.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                    </div>
+                    <div>
+                      <span className="text-[9px] font-black uppercase text-[#14B8A6] tracking-[0.2em] block mb-2">{l.speaker_label || 'USER'}</span>
+                      <p className="text-sm text-[#E5E7EB] leading-relaxed max-w-2xl">{l.content}</p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
       </main>
 
       <footer className="py-8 text-center text-[8px] font-black uppercase tracking-[0.4em] text-[#0F766E]/60">
-        Secure Transmission Mode // Active Session
+        Secure Transmission Mode // Vault Analysis Protocol
       </footer>
+      <style jsx global>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #0F766E; border-radius: 2px; }
+      `}</style>
     </div>
+  );
+}
+
+export default function LiveStatusPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#070F1A] flex items-center justify-center">
+        <div className="h-12 w-12 border-4 border-[#14B8A6]/20 border-t-[#14B8A6] rounded-full animate-spin" />
+      </div>
+    }>
+      <LiveStatusContent />
+    </Suspense>
   );
 }

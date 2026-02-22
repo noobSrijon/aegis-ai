@@ -37,6 +37,10 @@ export default function Home() {
   const [guardianEmail, setGuardianEmail] = useState("");
   const [guardianPhone, setGuardianPhone] = useState("");
   const [isSubmittingGuardian, setIsSubmittingGuardian] = useState(false);
+  const [selectedWard, setSelectedWard] = useState<{ id: string, name: string } | null>(null);
+  const [wardThreads, setWardThreads] = useState<any[]>([]);
+  const [isLoadingThreads, setIsLoadingThreads] = useState(false);
+  const [showWardThreadsModal, setShowWardThreadsModal] = useState(false);
 
   const supabase = createClient();
   const router = useRouter();
@@ -141,6 +145,33 @@ export default function Home() {
     }
   };
 
+  const fetchWardThreads = async (wardId: string, wardName: string) => {
+    try {
+      setIsLoadingThreads(true);
+      setSelectedWard({ id: wardId, name: wardName });
+      setShowWardThreadsModal(true);
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const res = await fetch(`http://localhost:8000/api/guarding/threads/${wardId}`, {
+        headers: { "Authorization": `Bearer ${session?.access_token}` }
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setWardThreads(data || []);
+      } else {
+        console.error("Failed to fetch ward threads");
+        setWardThreads([]);
+      }
+    } catch (err) {
+      console.error("Ward threads fetch error:", err);
+    } finally {
+      setIsLoadingThreads(false);
+    }
+  };
+
   const handleUpdateRole = async (isGuardian: boolean) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -152,7 +183,7 @@ export default function Home() {
           "Authorization": `Bearer ${session?.access_token}`,
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           account_role: role,
           is_enrolled: role === "guardian" ? true : undefined
         })
@@ -592,18 +623,16 @@ export default function Home() {
                       aiNotifications.map((notif, i) => (
                         <div
                           key={i}
-                          className={`p-3 rounded-xl border text-xs leading-relaxed transition-all ${
-                            notif.risk > 75
+                          className={`p-3 rounded-xl border text-xs leading-relaxed transition-all ${notif.risk > 75
                               ? 'bg-red-950/20 border-red-500/25 text-red-300'
                               : notif.risk > 40
-                              ? 'bg-amber-950/20 border-amber-500/25 text-amber-300'
-                              : 'bg-[#0F172A]/60 border-[#0F766E]/20 text-[#9CA3AF]'
-                          }`}
+                                ? 'bg-amber-950/20 border-amber-500/25 text-amber-300'
+                                : 'bg-[#0F172A]/60 border-[#0F766E]/20 text-[#9CA3AF]'
+                            }`}
                         >
                           <div className="flex items-center justify-between mb-1.5">
-                            <span className={`text-[9px] font-black uppercase tracking-widest ${
-                              notif.risk > 75 ? 'text-red-400' : notif.risk > 40 ? 'text-amber-400' : 'text-[#14B8A6]'
-                            }`}>
+                            <span className={`text-[9px] font-black uppercase tracking-widest ${notif.risk > 75 ? 'text-red-400' : notif.risk > 40 ? 'text-amber-400' : 'text-[#14B8A6]'
+                              }`}>
                               {notif.risk > 75 ? '⚠ HIGH RISK' : notif.risk > 40 ? '⚡ ELEVATED' : '✦ INSIGHT'}
                             </span>
                             <span className="text-[9px] text-zinc-600 font-mono">{notif.time}</span>
@@ -637,14 +666,14 @@ export default function Home() {
                 <h2 className="text-2xl font-black mb-2 text-[#E5E7EB]">Choose Your Role</h2>
                 <p className="text-[#9CA3AF] text-sm mb-8">How will you be using Black Box today?</p>
                 <div className="grid grid-cols-1 gap-4">
-                  <button 
+                  <button
                     onClick={() => handleUpdateRole(false)}
                     className="group p-6 bg-[#070F1A] border border-[#0F766E]/20 rounded-2xl text-left hover:border-[#14B8A6]/50 transition-all hover:bg-[#070F1A]/80 shadow-lg"
                   >
                     <h3 className="font-bold text-[#E5E7EB] mb-1">I need Protection</h3>
                     <p className="text-xs text-[#9CA3AF]">I want my guardians to monitor me during high-stakes events.</p>
                   </button>
-                  <button 
+                  <button
                     onClick={() => handleUpdateRole(true)}
                     className="group p-6 bg-[#070F1A] border border-[#0F766E]/20 rounded-2xl text-left hover:border-[#14B8A6]/50 transition-all hover:bg-[#070F1A]/80 shadow-lg"
                   >
@@ -659,9 +688,9 @@ export default function Home() {
                 <div className="bg-[#070F1A] p-6 rounded-2xl border border-[#0F766E]/20 italic text-lg mb-8 text-[#9CA3AF] leading-relaxed">
                   &quot;The quick brown fox jumps over the lazy dog. My shadow is my guardian, keeping me safe in the dark.&quot;
                 </div>
-                <button 
-                  onClick={handleEnrollVoice} 
-                  disabled={isRecording} 
+                <button
+                  onClick={handleEnrollVoice}
+                  disabled={isRecording}
                   className={`w-full py-4 rounded-full font-bold transition-all shadow-lg ${isRecording ? 'bg-[#FF8559] animate-pulse text-white' : 'bg-[#14B8A6] text-[#0B1120] hover:scale-105 hover:bg-[#22C9B7]'}`}
                 >
                   {isRecording ? "RECORDING..." : "START RECORDING"}
@@ -673,8 +702,8 @@ export default function Home() {
                 <form onSubmit={handleAddGuardian} className="space-y-4">
                   <input type="email" required placeholder="Guardian Email" value={guardianEmail} onChange={(e) => setGuardianEmail(e.target.value)} className="w-full bg-[#070F1A] border border-[#0F766E]/20 rounded-xl px-4 py-3 text-sm focus:border-[#14B8A6] outline-none text-[#E5E7EB] placeholder:text-zinc-700 transition-all" />
                   <input type="tel" placeholder="Guardian Phone" value={guardianPhone} onChange={(e) => setGuardianPhone(e.target.value)} className="w-full bg-[#070F1A] border border-[#0F766E]/20 rounded-xl px-4 py-3 text-sm focus:border-[#14B8A6] outline-none text-[#E5E7EB] placeholder:text-zinc-700 transition-all" />
-                  <button 
-                    disabled={isSubmittingGuardian} 
+                  <button
+                    disabled={isSubmittingGuardian}
                     className="w-full py-4 bg-[#14B8A6] text-[#0B1120] rounded-full font-black hover:bg-[#22C9B7] hover:scale-105 transition-all flex items-center justify-center gap-2 mt-4 shadow-lg shadow-[#14B8A6]/20 disabled:opacity-50"
                   >
                     {isSubmittingGuardian ? (
@@ -742,11 +771,10 @@ export default function Home() {
                 <button
                   onClick={startMonitoring}
                   disabled={status === 'connecting' || !sessionContext.trim()}
-                  className={`w-full py-5 font-black rounded-full transition-all uppercase tracking-[0.15em] shadow-lg ${
-                    !sessionContext.trim()
+                  className={`w-full py-5 font-black rounded-full transition-all uppercase tracking-[0.15em] shadow-lg ${!sessionContext.trim()
                       ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed shadow-none'
                       : 'bg-[#14B8A6] text-[#0B1120] hover:bg-[#22C9B7] hover:scale-[1.02] active:scale-[0.98] shadow-[#14B8A6]/20'
-                  }`}
+                    }`}
                 >
                   {status === 'connecting' ? 'CONNECTING...' : 'START BLACK-BOX'}
                 </button>
@@ -778,8 +806,8 @@ export default function Home() {
             <form onSubmit={handleAddGuardian} className="space-y-4">
               <input type="email" required placeholder="Guardian Email" value={guardianEmail} onChange={(e) => setGuardianEmail(e.target.value)} className="w-full bg-[#070F1A] border border-[#0F766E]/20 rounded-xl px-4 py-3 text-sm focus:border-[#14B8A6] outline-none text-[#E5E7EB] transition-all" />
               <input type="tel" placeholder="Guardian Phone" value={guardianPhone} onChange={(e) => setGuardianPhone(e.target.value)} className="w-full bg-[#070F1A] border border-[#0F766E]/20 rounded-xl px-4 py-3 text-sm focus:border-[#14B8A6] outline-none text-[#E5E7EB] transition-all" />
-              <button 
-                disabled={isSubmittingGuardian} 
+              <button
+                disabled={isSubmittingGuardian}
                 className="w-full py-4 bg-[#14B8A6] text-[#0B1120] rounded-full font-black hover:bg-[#22C9B7] hover:scale-105 transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#14B8A6]/20 disabled:opacity-50"
               >
                 {isSubmittingGuardian ? (
@@ -792,6 +820,57 @@ export default function Home() {
                 )}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showWardThreadsModal && (
+        <div className="fixed inset-0 z-[100] bg-[#070F1A]/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowWardThreadsModal(false)}>
+          <div className="max-w-xl w-full bg-[#0F172A] border border-[#0F766E]/30 rounded-[32px] p-8 shadow-[0_32px_80px_rgba(0,0,0,0.6)] animate-in fade-in zoom-in duration-300 flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-6 flex-shrink-0">
+              <h2 className="text-2xl font-black flex items-center gap-3">
+                <span className="w-1.5 h-6 bg-[#14B8A6] rounded-full" />
+                {selectedWard?.name}&apos;s Sessions
+              </h2>
+              <button onClick={() => setShowWardThreadsModal(false)} className="w-10 h-10 rounded-full bg-[#070F1A] flex items-center justify-center text-[#9CA3AF] hover:text-[#E5E7EB] transition-colors border border-[#0F766E]/20">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-1">
+              {isLoadingThreads ? (
+                <div className="py-20 flex flex-col items-center justify-center gap-4">
+                  <div className="h-12 w-12 border-4 border-[#14B8A6]/20 border-t-[#14B8A6] rounded-full animate-spin" />
+                  <p className="text-[10px] font-black uppercase tracking-widest text-[#14B8A6]">Scanning Vault...</p>
+                </div>
+              ) : wardThreads.length === 0 ? (
+                <div className="p-12 border-2 border-dashed border-[#0F766E]/20 rounded-[32px] text-center text-[#9CA3AF] italic bg-[#070F1A]/50">
+                  No historical traces found for this user.
+                </div>
+              ) : (
+                wardThreads.map((h, i) => (
+                  <div
+                    key={i}
+                    onClick={() => router.push(`/live-status?threadId=${h.id}`)}
+                    className="bg-[#070F1A] border border-[#0F766E]/20 rounded-[24px] p-5 cursor-pointer transition-all hover:bg-[#0F172A] hover:border-[#14B8A6]/40 shadow-lg group relative overflow-hidden"
+                  >
+                    <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#14B8A6" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    </div>
+                    <div className="flex justify-between items-start mb-3">
+                      <code className="text-[9px] text-[#14B8A6] font-mono bg-[#14B8A6]/10 px-2 py-0.5 rounded-md">{h.id.substring(0, 8)}...</code>
+                      <span className="text-[9px] font-bold text-[#9CA3AF] uppercase tracking-widest">{new Date(h.created_at).toLocaleString()}</span>
+                    </div>
+                    {h.initial_context && (
+                      <p className="text-xs text-[#E5E7EB] font-medium line-clamp-2 italic mb-1">
+                        &quot;{h.initial_context}&quot;
+                      </p>
+                    )}
+                    <span className="text-[8px] font-black uppercase tracking-widest text-[#0F766E] opacity-60">Click to monitor session dashboard</span>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -886,8 +965,8 @@ export default function Home() {
                     const p = rel.profiles;
                     if (!p) return null;
                     return (
-                      <div 
-                        key={rel.id} 
+                      <div
+                        key={rel.id}
                         onClick={() => rel.status !== 'pending' && router.push('/live-status')}
                         className={`bg-[#0F172A]/50 border border-[#0F766E]/20 rounded-[24px] p-6 flex items-center justify-between group transition-all hover:border-[#14B8A6]/30 shadow-lg ${rel.status !== 'pending' ? 'cursor-pointer' : ''}`}
                       >
@@ -901,19 +980,25 @@ export default function Home() {
                         </div>
                         <div className="text-right flex items-center gap-4">
                           {rel.status === 'pending' ? (
-                            <button 
+                            <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleAcceptGuardian(rel.id);
-                              }} 
+                              }}
                               className="px-5 py-2.5 bg-[#14B8A6] text-[#0B1120] text-[10px] font-black rounded-full hover:bg-[#22C9B7] hover:scale-105 transition-all uppercase tracking-widest shadow-lg"
                             >
                               Accept Request
                             </button>
                           ) : (
-                          <div className="text-[10px] font-black text-[#14B8A6] hover:text-[#22C9B7] uppercase transition-all tracking-widest border border-[#14B8A6]/20 bg-[#14B8A6]/5 px-4 py-2 rounded-full">
-                            Live Status
-                          </div>
+                            <div
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                fetchWardThreads(p.id, p.full_name || p.email);
+                              }}
+                              className="text-[10px] cursor-pointer font-black text-[#14B8A6] hover:text-[#22C9B7] uppercase transition-all tracking-widest border border-[#14B8A6]/20 bg-[#14B8A6]/5 px-4 py-2 rounded-full"
+                            >
+                              View Live
+                            </div>
                           )}
                           <button
                             onClick={(e) => {
