@@ -913,9 +913,16 @@ export default function Home() {
           <div className="space-y-4">
             {history.length === 0 ? <div className="p-12 border-2 border-dashed border-border rounded-[32px] text-center text-slate-400 italic bg-surface/30">No historical traces found.</div> :
               history.map((h, i) => (
-                <div key={i} className="bg-surface border border-border rounded-[24px] p-6 transition-all hover:bg-slate-50 hover:border-primary/30 shadow-sm group">
+                <div 
+                  key={i} 
+                  onClick={() => router.push(`/live-status?threadId=${h.id}`)}
+                  className="bg-surface border border-border rounded-[24px] p-6 transition-all hover:bg-slate-50 hover:border-primary/30 shadow-sm group cursor-pointer relative overflow-hidden"
+                >
+                  <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                  </div>
                   <div className="flex justify-between items-start mb-4">
-                    <code className="text-[10px] text-primary font-mono bg-primary/10 px-2 py-0.5 rounded-md">{h.id}</code>
+                    <code className="text-[10px] text-primary font-mono bg-primary/10 px-2 py-0.5 rounded-md">{h.id.substring(0, 8)}...</code>
                     <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{new Date(h.created_at).toLocaleString()}</span>
                   </div>
                   {h.initial_context && (
@@ -924,12 +931,16 @@ export default function Home() {
                     </div>
                   )}
                   <div className="space-y-3">
-                    {h.logs?.slice(0, 3).map((l: any, i: number) => (
+                    {h.logs?.slice(0, 2).map((l: any, i: number) => (
                       <div key={i} className="text-sm text-slate-700 line-clamp-1 border-l-2 border-primary/20 pl-4 py-1">
                         <span className="text-[10px] font-black mr-3 text-primary uppercase tracking-wider">{l.speaker_label || 'USER'}:</span>
                         {l.content}
                       </div>
                     ))}
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-border/50 text-[10px] font-black text-primary uppercase tracking-[0.2em] opacity-60 group-hover:opacity-100 transition-opacity flex items-center gap-2">
+                    Open Detailed Transcription 
+                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                   </div>
                 </div>
               ))}
