@@ -4,6 +4,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, Suspense, useRef } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import dynamic from 'next/dynamic';
+
+const Map = dynamic(() => import('@/components/Map'), { ssr: false });
 
 function LiveStatusContent() {
   const router = useRouter();
@@ -11,11 +14,13 @@ function LiveStatusContent() {
   const threadId = searchParams.get("threadId");
   const supabase = createClient();
   const transcriptEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const [risk, setRisk] = useState(45);
   const [logs, setLogs] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(!!threadId);
   const [sessionContext, setSessionContext] = useState("");
+  const [lastLocation, setLastLocation] = useState<{ lat: number; lon: number } | null>(null);
 
   // Simulation graph data state
   const [riskData, setRiskData] = useState([
@@ -61,6 +66,13 @@ function LiveStatusContent() {
 
           setLogs(data.logs || []);
           setSessionContext(data.initial_context || "");
+
+          // Get last known location from logs
+          const logsWithLocation = (data.logs || []).filter((l: any) => l.latitude && l.longitude);
+          if (logsWithLocation.length > 0) {
+            const lastLog = logsWithLocation[logsWithLocation.length - 1];
+            setLastLocation({ lat: lastLog.latitude, lon: lastLog.longitude });
+          }
         }
       } catch (err) {
         console.error("Failed to fetch thread data:", err);
@@ -74,9 +86,16 @@ function LiveStatusContent() {
     return () => clearInterval(interval);
   }, [threadId, supabase]);
 
-  // Scroll to bottom of transcript
+  // Scroll to bottom of transcript only if user is at the bottom
   useEffect(() => {
-    transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const container = scrollContainerRef.current;
+    if (container) {
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
+      if (isAtBottom) {
+        transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }
+    }
   }, [logs]);
 
   if (isLoading) {
@@ -191,9 +210,19 @@ function LiveStatusContent() {
           </div>
         </div>
 
+        <div className="bg-surface border border-border rounded-[32px] p-8 shadow-sm flex flex-col mb-8 h-[400px]">
+          <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-6 font-mono">Last Known Location</label>
+          <div className="flex-1 relative">
+            <Map location={lastLocation} />
+          </div>
+        </div>
+
         <div className="bg-surface border border-border rounded-[32px] p-8 shadow-sm flex flex-col max-h-[600px]">
           <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-6 font-mono">Session Intelligence Feed</label>
-          <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2">
+          <div 
+            ref={scrollContainerRef}
+            className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2"
+          >
             {logs.length === 0 ? (
               <div className="py-20 text-center border border-dashed border-border rounded-2xl opacity-50">
                 <p className="text-sm font-mono uppercase tracking-widest text-slate-400 italic">No signals recorded during this session</p>
