@@ -174,6 +174,7 @@ async def get_profile_role(user=Depends(get_current_user)):
 
 class RoleUpdate(BaseModel):
     account_role: str
+    is_enrolled: bool = None
 
 
 @app.post("/api/profile/role")
@@ -187,7 +188,11 @@ async def update_profile_role(data: RoleUpdate, user=Depends(get_current_user)):
         return {"error": "Invalid role. Must be 'guardian' or 'both'"}, 400
 
     try:
-        supabase.table("profiles").update({"account_role": role}).eq("id", user.id).execute()
+        update_data = {"account_role": role}
+        if data.is_enrolled is not None:
+            update_data["is_enrolled"] = data.is_enrolled
+            
+        supabase.table("profiles").update(update_data).eq("id", user.id).execute()
         return {"message": f"Account role updated to {role}"}
     except Exception as e:
         print(f"Role update error: {e}")

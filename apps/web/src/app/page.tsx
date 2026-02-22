@@ -22,7 +22,7 @@ export default function Home() {
   // Onboarding, History, Guarding & Notifications state
   const [profile, setProfile] = useState<{ is_enrolled: boolean, account_role?: string, email?: string, full_name?: string } | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [onboardingStep, setOnboardingStep] = useState<1 | 2>(1);
+  const [onboardingStep, setOnboardingStep] = useState<0 | 1 | 2>(0);
   const [showAddGuardianModal, setShowAddGuardianModal] = useState(false);
   const [showInitiationModal, setShowInitiationModal] = useState(false);
   const [sessionContext, setSessionContext] = useState("");
@@ -33,9 +33,9 @@ export default function Home() {
   const [myGuardians, setMyGuardians] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [isRecording, setIsRecording] = useState(false);
-  const [isAddingGuardian, setIsAddingGuardian] = useState(false);
   const [guardianEmail, setGuardianEmail] = useState("");
   const [guardianPhone, setGuardianPhone] = useState("");
+  const [isSubmittingGuardian, setIsSubmittingGuardian] = useState(false);
 
   const supabase = createClient();
   const router = useRouter();
@@ -67,7 +67,10 @@ export default function Home() {
       ]);
 
       setProfile(profData);
-      if (profData && !profData.is_enrolled) setShowOnboarding(true);
+      if (profData && !profData.is_enrolled) {
+        setShowOnboarding(true);
+        setOnboardingStep(0);
+      }
       if (profData?.account_role === "guardian") {
         setActiveTab("guardians");
       }
@@ -148,13 +151,19 @@ export default function Home() {
           "Authorization": `Bearer ${session?.access_token}`,
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ account_role: role })
+        body: JSON.stringify({ 
+          account_role: role,
+          is_enrolled: role === "guardian" ? true : undefined
+        })
       });
 
       if (res.ok) {
-        setProfile(prev => prev ? { ...prev, account_role: role } : null);
-        if (role === "guardian" && (activeTab === "black-box" || activeTab === "history" || activeTab === "notifications")) {
+        setProfile(prev => prev ? { ...prev, account_role: role, is_enrolled: role === "guardian" ? true : prev.is_enrolled } : null);
+        if (role === "guardian") {
           setActiveTab("guardians");
+          setShowOnboarding(false);
+        } else {
+          setOnboardingStep(1);
         }
       }
     } catch (err) {
@@ -351,8 +360,8 @@ export default function Home() {
 
   const handleAddGuardian = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isAddingGuardian) return;
-    setIsAddingGuardian(true);
+    if (isSubmittingGuardian) return;
+    setIsSubmittingGuardian(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
@@ -383,7 +392,7 @@ export default function Home() {
     } catch (err) {
       console.error("Add guardian failed:", err);
     } finally {
-      setIsAddingGuardian(false);
+      setIsSubmittingGuardian(false);
     }
   };
 
@@ -521,31 +530,69 @@ export default function Home() {
       )}
 
       {showOnboarding && (
-        <div className="fixed inset-0 z-[100] bg-[#070F1A]/95 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="max-w-md w-full bg-[#0F172A] border border-[#0F766E]/30 rounded-[32px] p-8 shadow-[0_32px_80px_rgba(0,0,0,0.6)] animate-in fade-in zoom-in duration-300">
-            <div className="w-16 h-16 bg-[#14B8A6]/10 rounded-3xl flex items-center justify-center mb-6 mx-auto">
-              <svg className="w-8 h-8 text-[#14B8A6]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
-            </div>
-            <h2 className="text-2xl font-black text-center mb-2">Welcome to Black-Box</h2>
-            <p className="text-[#9CA3AF] text-center text-sm mb-8 leading-relaxed">Add a trusted guardian to monitor your safety during high-stakes situations.</p>
-
-            <div className="space-y-6">
-              <form onSubmit={handleAddGuardian} className="space-y-4">
-                <input type="email" required placeholder="Guardian Email" value={guardianEmail} onChange={(e) => setGuardianEmail(e.target.value)} className="w-full bg-[#070F1A] border border-[#0F766E]/20 rounded-2xl px-4 py-4 text-sm focus:border-[#14B8A6] outline-none transition-all placeholder:text-zinc-800" />
-                <input type="tel" placeholder="Guardian Phone" value={guardianPhone} onChange={(e) => setGuardianPhone(e.target.value)} className="w-full bg-[#070F1A] border border-[#0F766E]/20 rounded-2xl px-4 py-4 text-sm focus:border-[#14B8A6] outline-none transition-all placeholder:text-zinc-800" />
-                <button
-                  disabled={isAddingGuardian}
-                  className="w-full py-5 bg-[#14B8A6] text-[#0B1120] rounded-full font-black hover:bg-[#22C9B7] hover:scale-105 transition-all disabled:opacity-50 disabled:scale-100 uppercase tracking-widest shadow-lg"
+        <div className="fixed inset-0 z-[100] bg-[#070F1A]/90 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="max-w-md w-full bg-[#0F172A] border border-[#0F766E]/30 rounded-[32px] p-8 shadow-2xl animate-in zoom-in-95 duration-300">
+            {onboardingStep === 0 ? (
+              <div className="text-center">
+                <h2 className="text-2xl font-black mb-2 text-[#E5E7EB]">Choose Your Role</h2>
+                <p className="text-[#9CA3AF] text-sm mb-8">How will you be using Black Box today?</p>
+                <div className="grid grid-cols-1 gap-4">
+                  <button 
+                    onClick={() => handleUpdateRole(false)}
+                    className="group p-6 bg-[#070F1A] border border-[#0F766E]/20 rounded-2xl text-left hover:border-[#14B8A6]/50 transition-all hover:bg-[#070F1A]/80 shadow-lg"
+                  >
+                    <h3 className="font-bold text-[#E5E7EB] mb-1">I need Protection</h3>
+                    <p className="text-xs text-[#9CA3AF]">I want my guardians to monitor me during high-stakes events.</p>
+                  </button>
+                  <button 
+                    onClick={() => handleUpdateRole(true)}
+                    className="group p-6 bg-[#070F1A] border border-[#0F766E]/20 rounded-2xl text-left hover:border-[#14B8A6]/50 transition-all hover:bg-[#070F1A]/80 shadow-lg"
+                  >
+                    <h3 className="font-bold text-[#E5E7EB] mb-1">I am a Guardian</h3>
+                    <p className="text-xs text-[#9CA3AF]">I am here only to watch over others and respond to alerts.</p>
+                  </button>
+                </div>
+              </div>
+            ) : onboardingStep === 1 ? (
+              <div className="text-center">
+                <h2 className="text-2xl font-black mb-4 text-[#E5E7EB]">Voice Enrollment</h2>
+                <div className="bg-[#070F1A] p-6 rounded-2xl border border-[#0F766E]/20 italic text-lg mb-8 text-[#9CA3AF] leading-relaxed">
+                  &quot;The quick brown fox jumps over the lazy dog. My shadow is my guardian, keeping me safe in the dark.&quot;
+                </div>
+                <button 
+                  onClick={handleEnrollVoice} 
+                  disabled={isRecording} 
+                  className={`w-full py-4 rounded-full font-bold transition-all shadow-lg ${isRecording ? 'bg-[#FF8559] animate-pulse text-white' : 'bg-[#14B8A6] text-[#0B1120] hover:scale-105 hover:bg-[#22C9B7]'}`}
                 >
-                  {isAddingGuardian ? "SUBMITTING..." : "COMPLETE SETUP"}
+                  {isRecording ? "RECORDING..." : "START RECORDING"}
                 </button>
-              </form>
-            </div>
+              </div>
+            ) : (
+              <div>
+                <h2 className="text-2xl font-black mb-6 text-center text-[#E5E7EB]">Guardian Setup</h2>
+                <form onSubmit={handleAddGuardian} className="space-y-4">
+                  <input type="email" required placeholder="Guardian Email" value={guardianEmail} onChange={(e) => setGuardianEmail(e.target.value)} className="w-full bg-[#070F1A] border border-[#0F766E]/20 rounded-xl px-4 py-3 text-sm focus:border-[#14B8A6] outline-none text-[#E5E7EB] placeholder:text-zinc-700 transition-all" />
+                  <input type="tel" placeholder="Guardian Phone" value={guardianPhone} onChange={(e) => setGuardianPhone(e.target.value)} className="w-full bg-[#070F1A] border border-[#0F766E]/20 rounded-xl px-4 py-3 text-sm focus:border-[#14B8A6] outline-none text-[#E5E7EB] placeholder:text-zinc-700 transition-all" />
+                  <button 
+                    disabled={isSubmittingGuardian} 
+                    className="w-full py-4 bg-[#14B8A6] text-[#0B1120] rounded-full font-black hover:bg-[#22C9B7] hover:scale-105 transition-all flex items-center justify-center gap-2 mt-4 shadow-lg shadow-[#14B8A6]/20 disabled:opacity-50"
+                  >
+                    {isSubmittingGuardian ? (
+                      <>
+                        <div className="h-4 w-4 border-2 border-[#0B1120]/20 border-t-[#0B1120] rounded-full animate-spin" />
+                        PROCESSING...
+                      </>
+                    ) : (
+                      "COMPLETE SETUP"
+                    )}
+                  </button>
+                </form>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Initiation Modal */}
       {showInitiationModal && (
         <div className="fixed inset-0 z-[100] bg-[#070F1A]/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowInitiationModal(false)}>
           <div className="max-w-lg w-full bg-[#0F172A] border border-[#0F766E]/30 rounded-[32px] p-8 shadow-[0_32px_80px_rgba(0,0,0,0.6)] active:scale-[0.99] transition-all" onClick={e => e.stopPropagation()}>
@@ -608,7 +655,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* Manual Add Guardian Modal */}
       {showAddGuardianModal && (
         <div className="fixed inset-0 z-[100] bg-[#070F1A]/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowAddGuardianModal(false)}>
           <div className="max-w-md w-full bg-[#0F172A] border border-[#0F766E]/30 rounded-[32px] p-8 shadow-[0_32px_80px_rgba(0,0,0,0.6)] animate-in fade-in zoom-in duration-300" onClick={e => e.stopPropagation()}>
@@ -623,18 +669,26 @@ export default function Home() {
             </div>
             <p className="text-[#9CA3AF] text-sm mb-8 leading-relaxed">They will receive an alert if your risk levels spike during a session.</p>
             <form onSubmit={handleAddGuardian} className="space-y-4">
-              <input type="email" required placeholder="Guardian Email" value={guardianEmail} onChange={(e) => setGuardianEmail(e.target.value)} className="w-full bg-[#070F1A] border border-[#0F766E]/20 rounded-2xl px-4 py-4 text-sm focus:border-[#14B8A6] outline-none transition-all placeholder:text-zinc-800" />
-              <input type="tel" placeholder="Guardian Phone" value={guardianPhone} onChange={(e) => setGuardianPhone(e.target.value)} className="w-full bg-[#070F1A] border border-[#0F766E]/20 rounded-2xl px-4 py-4 text-sm focus:border-[#14B8A6] outline-none transition-all placeholder:text-zinc-800" />
-              <button
-                disabled={isAddingGuardian}
-                className="w-full py-5 bg-[#14B8A6] text-[#0B1120] rounded-full font-black hover:bg-[#22C9B7] hover:scale-105 transition-all disabled:opacity-50 disabled:scale-100 uppercase tracking-widest shadow-lg shadow-[#14B8A6]/20"
+              <input type="email" required placeholder="Guardian Email" value={guardianEmail} onChange={(e) => setGuardianEmail(e.target.value)} className="w-full bg-[#070F1A] border border-[#0F766E]/20 rounded-xl px-4 py-3 text-sm focus:border-[#14B8A6] outline-none text-[#E5E7EB] transition-all" />
+              <input type="tel" placeholder="Guardian Phone" value={guardianPhone} onChange={(e) => setGuardianPhone(e.target.value)} className="w-full bg-[#070F1A] border border-[#0F766E]/20 rounded-xl px-4 py-3 text-sm focus:border-[#14B8A6] outline-none text-[#E5E7EB] transition-all" />
+              <button 
+                disabled={isSubmittingGuardian} 
+                className="w-full py-4 bg-[#14B8A6] text-[#0B1120] rounded-full font-black hover:bg-[#22C9B7] hover:scale-105 transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#14B8A6]/20 disabled:opacity-50"
               >
-                {isAddingGuardian ? "ADDING..." : "ADD GUARDIAN"}
+                {isSubmittingGuardian ? (
+                  <>
+                    <div className="h-4 w-4 border-2 border-[#0B1120]/20 border-t-[#0B1120] rounded-full animate-spin" />
+                    ADDING...
+                  </>
+                ) : (
+                  "ADD GUARDIAN"
+                )}
               </button>
             </form>
           </div>
         </div>
       )}
+
 
       {/* History View */}
       {!isLoading && activeTab === "history" && (
