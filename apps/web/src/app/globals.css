@@ -47,6 +47,63 @@ body {
   }
 }
 
+@keyframes steel-shine {
+  0% {
+    background-position: 0% center;
+  }
+
+  100% {
+    background-position: 200% center;
+  }
+}
+
+@keyframes float {
+
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+
+  50% {
+    transform: translateY(-20px) scale(1.05);
+  }
+}
+
+.steel-shine {
+  color: #0F172A;
+  /* Slate 900 / Black */
+  position: relative;
+  display: inline-block;
+  background: linear-gradient(110deg,
+      #94a3b8 20%,
+      #cbd5e1 40%,
+      #f8fafc 50%,
+      #cbd5e1 60%,
+      #94a3b8 80%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  /* Use a drop shadow to create a subtle metallic "glow" or "rim" around the black text */
+  filter: drop-shadow(0 0 1px rgba(148, 163, 184, 0.5));
+  animation: steel-shine 4s linear infinite;
+}
+
+/* For a more precise border effect, we use text-stroke on a pseudo-element if needed, 
+   but for now, let's try a layered approach in the component */
+.steel-border {
+  -webkit-text-stroke: 1.5px transparent;
+  background: linear-gradient(110deg,
+      #94a3b8 20%,
+      #cbd5e1 40%,
+      #f8fafc 50%,
+      #cbd5e1 60%,
+      #94a3b8 80%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: steel-shine 3s linear infinite;
+}
+
 .animate-shimmer {
   position: relative;
   overflow: hidden;
@@ -64,6 +121,22 @@ body {
       rgba(255, 255, 255, 0.6),
       transparent);
   animation: shimmer 2s infinite;
+}
+
+.bg-mesh {
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(at 0% 0%, hsla(172, 70%, 94%, 1) 0px, transparent 50%),
+    radial-gradient(at 50% 0%, hsla(180, 50%, 92%, 1) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, hsla(170, 60%, 95%, 1) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, hsla(185, 40%, 93%, 1) 0px, transparent 50%),
+    radial-gradient(at 50% 100%, hsla(190, 30%, 95%, 1) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, hsla(175, 50%, 94%, 1) 0px, transparent 50%);
+  background-attachment: fixed;
+}
+
+.floating-halo {
+  animation: float 10s ease-in-out infinite;
 }
 
 /* Custom Scrollbar */

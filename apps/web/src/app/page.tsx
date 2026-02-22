@@ -447,21 +447,20 @@ export default function Home() {
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
   return (
-    <div className="flex min-h-screen flex-col bg-background text-foreground font-sans selection:bg-primary/10 overflow-x-hidden relative">
+    <div className="flex min-h-screen flex-col bg-mesh text-foreground font-sans selection:bg-primary/10 overflow-x-hidden relative">
       {/* Background Halo */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1000px] h-[1000px] bg-primary/5 rounded-full blur-[120px]" />
-        <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-primary/3 rounded-full blur-[80px]" />
-        <div className="absolute -bottom-[10%] -right-[10%] w-[40%] h-[40%] bg-primary/3 rounded-full blur-[80px]" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1000px] h-[1000px] bg-primary/10 rounded-full blur-[120px] floating-halo" />
+        <div className="absolute -top-[10%] -left-[10%] w-[50%] h-[50%] bg-primary/5 rounded-full blur-[100px] animate-pulse" />
+        <div className="absolute -bottom-[10%] -right-[10%] w-[50%] h-[50%] bg-primary/5 rounded-full blur-[100px] animate-pulse" />
       </div>
 
-      <nav className="fixed top-6 left-1/2 -translate-x-1/2 z-50 px-2 py-2 bg-surface/80 backdrop-blur-xl border border-border rounded-full shadow-lg flex items-center gap-1">
+      <nav className="fixed top-4 md:top-8 left-1/2 -translate-x-1/2 z-50 p-2 bg-white/30 backdrop-blur-3xl border border-white/40 rounded-full shadow-[0_8px_32px_rgba(0,0,0,0.04)] flex items-center gap-1.5 transition-all duration-500 hover:bg-white/50 hover:border-white/60 max-w-[95vw] overflow-x-auto no-scrollbar">
         {isLoading ? (
-          <div className="flex items-center gap-2 px-4 py-2">
-            <div className="w-20 h-6 bg-surface-alt rounded-full animate-pulse" />
-            <div className="w-20 h-6 bg-surface-alt rounded-full animate-pulse" />
-            <div className="w-20 h-6 bg-surface-alt rounded-full animate-pulse" />
-            <div className="w-20 h-6 bg-surface-alt rounded-full animate-pulse" />
+          <div className="flex items-center gap-2 px-6 py-2">
+            <div className="w-16 h-4 bg-slate-200/50 rounded-full animate-pulse" />
+            <div className="w-16 h-4 bg-slate-200/50 rounded-full animate-pulse" />
+            <div className="w-16 h-4 bg-slate-200/50 rounded-full animate-pulse" />
           </div>
         ) : (
           <>
@@ -469,48 +468,49 @@ export default function Home() {
               <>
                 <button
                   onClick={() => setActiveTab("aegis-ai")}
-                  className={`px-5 py-2 rounded-full text-[11px] font-black uppercase tracking-widest transition-all flex items-center gap-2 border ${activeTab === "aegis-ai" ? "bg-primary text-white border-primary shadow-lg" : "text-slate-400 border-transparent hover:text-primary hover:bg-primary/5"}`}
+                  className={`px-5 md:px-6 py-3 md:py-2.5 rounded-full text-[10px] font-black uppercase tracking-[0.25em] transition-all duration-300 flex items-center gap-2.5 ${activeTab === "aegis-ai" ? "bg-slate-900 text-white shadow-[0_8px_16px_rgba(0,0,0,0.1)]" : "text-slate-500 hover:text-slate-900 hover:bg-slate-900/5"}`}
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                  Aegis AI
+                  <svg className="w-4 h-4 md:w-3.5 md:h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                  <span className="hidden md:inline whitespace-nowrap">Aegis AI</span>
                 </button>
                 <button
                   onClick={() => setActiveTab("history")}
-                  className={`px-5 py-2 rounded-full text-[11px] font-black uppercase tracking-widest transition-all flex items-center gap-2 border ${activeTab === "history" ? "bg-primary text-white border-primary shadow-lg" : "text-slate-400 border-transparent hover:text-primary hover:bg-primary/5"}`}
+                  className={`px-5 md:px-6 py-3 md:py-2.5 rounded-full text-[10px] font-black uppercase tracking-[0.25em] transition-all duration-300 flex items-center gap-2.5 ${activeTab === "history" ? "bg-slate-900 text-white shadow-[0_8px_16px_rgba(0,0,0,0.1)]" : "text-slate-500 hover:text-slate-900 hover:bg-slate-900/5"}`}
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                  History
+                  <svg className="w-4 h-4 md:w-3.5 md:h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  <span className="hidden md:inline whitespace-nowrap">History</span>
                 </button>
               </>
             )}
             <button
               onClick={() => setActiveTab("guardians")}
-              className={`px-5 py-2 rounded-full text-[11px] font-black uppercase tracking-widest transition-all flex items-center gap-2 border ${activeTab === "guardians" ? "bg-primary text-white border-primary shadow-lg" : "text-slate-400 border-transparent hover:text-primary hover:bg-primary/5"}`}
+              className={`px-5 md:px-6 py-3 md:py-2.5 rounded-full text-[10px] font-black uppercase tracking-[0.25em] transition-all duration-300 flex items-center gap-2.5 ${activeTab === "guardians" ? "bg-slate-900 text-white shadow-[0_8px_16px_rgba(0,0,0,0.1)]" : "text-slate-500 hover:text-slate-900 hover:bg-slate-900/5"}`}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-              Guardians
+              <svg className="w-4 h-4 md:w-3.5 md:h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              <span className="hidden md:inline whitespace-nowrap">Guardians</span>
             </button>
             <button
               onClick={() => setActiveTab("notifications")}
-              className={`px-5 py-2 rounded-full text-[11px] font-black uppercase tracking-widest transition-all flex items-center gap-2 relative border ${activeTab === "notifications" ? "bg-primary text-white border-primary shadow-lg" : "text-slate-400 border-transparent hover:text-primary hover:bg-primary/5"}`}
+              className={`px-5 md:px-6 py-3 md:py-2.5 rounded-full text-[10px] font-black uppercase tracking-[0.25em] transition-all duration-300 flex items-center gap-2.5 relative ${activeTab === "notifications" ? "bg-slate-900 text-white shadow-[0_8px_16px_rgba(0,0,0,0.1)]" : "text-slate-500 hover:text-slate-900 hover:bg-slate-900/5"}`}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-              Alerts
-              {unreadCount > 0 && <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-accent-warm text-[8px] font-black text-white shadow-lg ring-2 ring-background">{unreadCount}</span>}
+              <svg className="w-4 h-4 md:w-3.5 md:h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+              <span className="hidden md:inline whitespace-nowrap">Alerts</span>
+              {unreadCount > 0 && <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-accent-warm text-[8px] font-black text-white shadow-lg ring-2 ring-white">{unreadCount}</span>}
             </button>
+            <div className="w-[1px] h-4 bg-slate-200 mx-1" />
             <button
               onClick={() => setActiveTab("profile")}
-              className={`px-5 py-2 rounded-full text-[11px] font-black uppercase tracking-widest transition-all flex items-center gap-2 border ${activeTab === "profile" ? "bg-primary text-white border-primary shadow-lg" : "text-slate-400 border-transparent hover:text-primary hover:bg-primary/5"}`}
+              className={`px-5 md:px-6 py-3 md:py-2.5 rounded-full text-[10px] font-black uppercase tracking-[0.25em] transition-all duration-300 flex items-center gap-2.5 ${activeTab === "profile" ? "bg-slate-900 text-white shadow-[0_8px_16px_rgba(0,0,0,0.1)]" : "text-slate-500 hover:text-slate-900 hover:bg-slate-900/5"}`}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-              Account
+              <svg className="w-4 h-4 md:w-3.5 md:h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              <span className="hidden md:inline whitespace-nowrap">Account</span>
             </button>
           </>
         )}
       </nav>
 
       {isLoading && (
-        <main className="flex-1 flex flex-col pt-32 px-4 max-w-4xl mx-auto w-full">
+        <main className="flex-1 flex flex-col pt-40 px-4 max-w-4xl mx-auto w-full">
           <div className="w-48 h-10 bg-slate-100 rounded-2xl mb-8 animate-pulse" />
           <div className="space-y-4">
             <div className="h-32 bg-slate-50 rounded-3xl animate-pulse" />
@@ -521,17 +521,33 @@ export default function Home() {
       )}
 
       {!isLoading && activeTab === "aegis-ai" && (
-        <main className={`flex-1 flex flex-col mx-auto w-full relative z-10 ${isMonitoring ? 'max-w-7xl lg:h-screen lg:max-h-screen lg:overflow-hidden' : 'max-w-4xl pt-32 pb-12'}`}>
+        <main className={`flex-1 flex flex-col mx-auto w-full relative z-10 ${isMonitoring ? 'max-w-7xl lg:h-screen lg:max-h-screen lg:overflow-hidden' : 'max-w-5xl pt-40 pb-12'}`}>
           {isMonitoring && <div className="h-24 flex-shrink-0" />} {/* Spacer for fixed nav */}
           {!isMonitoring ? (
-            <div className="flex-1 flex flex-col items-center justify-center text-center">
-              <div className="mb-8 p-4 rounded-2xl bg-surface border border-border max-w-lg shadow-sm">
-                <h2 className="text-xl font-bold mb-4 flex items-center justify-center gap-3">
-                  <span className="w-1.5 h-6 bg-primary rounded-full" />
-                  Aegis AI
-                </h2>
-                <p className="text-slate-600 text-sm leading-relaxed max-w-[520px]">Conversational guardian for high-stakes events. Real-time risk evaluation as you speak.</p>
+            <div className="flex-1 flex flex-col items-center justify-center text-center px-4">
+              <div className="relative mb-16 select-none group">
+                <h1 className="text-7xl md:text-8xl lg:text-9xl font-black tracking-tighter leading-none relative">
+                  <span className="absolute inset-0 steel-border opacity-70 blur-[2px] group-hover:opacity-100 transition-opacity duration-500" aria-hidden="true">
+                    Aegis AI
+                  </span>
+                  <span className="relative text-slate-900 group-hover:text-black transition-colors duration-500">
+                    Aegis AI
+                  </span>
+                </h1>
+                <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-4 w-full justify-center">
+                  <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-primary/20 to-transparent max-w-[100px]" />
+                  <p className="text-[10px] font-black uppercase tracking-[0.5em] text-slate-400 bg-white/50 backdrop-blur px-4 py-1.5 rounded-full border border-white/50 whitespace-nowrap">
+                    Conversational Guardian
+                  </p>
+                  <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-primary/20 to-transparent max-w-[100px]" />
+                </div>
               </div>
+
+              <p className="text-slate-500 text-lg md:text-xl leading-relaxed max-w-2xl mb-12 font-medium">
+                Real-time risk evaluation for high-stakes events. 
+                <span className="block text-slate-400 text-sm mt-2 font-normal">Advanced AI protection as you speak.</span>
+              </p>
+
               <button
                 onClick={() => {
                   setSessionContext("");
@@ -539,13 +555,16 @@ export default function Home() {
                   setShowInitiationModal(true);
                 }}
                 disabled={status === 'connecting'}
-                className="group px-10 py-5 bg-primary text-white font-black rounded-full hover:bg-teal-bright hover:scale-105 hover:shadow-lg active:scale-95 transition-all flex items-center gap-3 uppercase tracking-widest"
+                className="group relative px-12 py-6 bg-primary text-white font-black rounded-full transition-all hover:-translate-y-1 active:scale-95 flex items-center gap-4 uppercase tracking-[0.2em] overflow-hidden"
               >
-                INITIATE AEGIS AI
-                <svg className="w-4 h-4 text-white group-hover:translate-x-1 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                <span className="relative z-10">INITIATE AEGIS AI</span>
+                <svg className="w-5 h-5 text-white transition-transform relative z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
               </button>
+
               {status === "error" && (
-                <p className="mt-4 text-red-500 text-xs font-bold uppercase tracking-widest animate-pulse">Connection Failed. Please check console for details.</p>
+                <p className="mt-8 text-red-500 text-[10px] font-black uppercase tracking-widest animate-pulse border border-red-100 bg-red-50/50 px-4 py-2 rounded-full">
+                  Connection Failed • Check System Console
+                </p>
               )}
             </div>
           ) : (
