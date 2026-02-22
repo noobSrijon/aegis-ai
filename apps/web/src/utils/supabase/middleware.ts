@@ -54,7 +54,11 @@ export async function updateSession(request: NextRequest) {
         }
     )
 
-    await supabase.auth.getUser()
+    // IMPORTANT: Do not remove this. It refreshes the session if needed.
+    const { data: { user } } = await supabase.auth.getUser()
+
+    // If there is no user and the current path is not /login, you might want to redirect
+    // but here we just return the response to let the page handle it or for other middleware logic.
 
     return response
 }
